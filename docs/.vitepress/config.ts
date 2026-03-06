@@ -3,6 +3,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: 'Video Background Remover CLI',
   description: 'Remove backgrounds from videos using rembg and OpenCV',
+  base: '/video-background-remover-cli/',
 
   locales: {
     root: {

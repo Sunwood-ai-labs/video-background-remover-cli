@@ -132,7 +132,15 @@ With `--animated both`, the tool writes both `.webp` and `.gif` using the same b
 - Input video: `assets/onizuka_idle_motion.mp4`
 - Animated WebP: `example/output_animated.webp`
 - GIF: `output/output.gif`
+- Comparison GIF: `example/onizuka_walk_motion.gif`
+- Comparison WebP: `example/onizuka_walk_motion.webp`
 - Transparent frames: `output_frames_webp/`
+
+### GIF / WebP Comparison
+
+| GIF | WebP |
+| --- | --- |
+| ![GIF comparison](example/onizuka_walk_motion.gif) | ![WebP comparison](example/onizuka_walk_motion.webp) |
 
 ## Notes
 

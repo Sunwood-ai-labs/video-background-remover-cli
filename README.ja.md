@@ -132,7 +132,15 @@ python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames
 - 入力動画: `assets/onizuka_idle_motion.mp4`
 - アニメーション WebP: `example/output_animated.webp`
 - GIF: `output/output.gif`
+- 比較用 GIF: `example/onizuka_walk_motion.gif`
+- 比較用 WebP: `example/onizuka_walk_motion.webp`
 - 透過フレーム: `output_frames_webp/`
+
+### GIF / WebP 比較
+
+| GIF | WebP |
+| --- | --- |
+| ![GIF comparison](example/onizuka_walk_motion.gif) | ![WebP comparison](example/onizuka_walk_motion.webp) |
 
 ## Notes
 

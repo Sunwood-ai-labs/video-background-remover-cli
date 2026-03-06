@@ -364,6 +364,7 @@ class VideoBackgroundRemover:
             frames = gif_frames
             save_kwargs["append_images"] = frames[1:]
             save_kwargs["optimize"] = True
+            save_kwargs["disposal"] = 1  # Do Not Dispose - prevents black trails!
 
         frames[0].save(output_path, format=format_upper, **save_kwargs)
 

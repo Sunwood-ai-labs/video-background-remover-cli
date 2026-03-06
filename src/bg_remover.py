@@ -11,7 +11,7 @@ Process flow:
 """
 
 import os
-import tempfile
+import shutil
 import cv2
 import numpy as np
 from PIL import Image
@@ -229,6 +229,8 @@ class VideoBackgroundRemover:
 
         frames = []
         frame_count = 0
+        frames_output_dir = self._prepare_animation_frames_dir(output_path)
+        print(f"Saving processed frames to {frames_output_dir}")
 
         with tqdm(total=total_frames, desc="Processing") as pbar:
             while True:
@@ -241,6 +243,10 @@ class VideoBackgroundRemover:
                     result = self.remove_background_from_frame(frame)
                     result_pil = Image.fromarray(result)
                     frames.append(result_pil)
+                    result_pil.save(
+                        os.path.join(frames_output_dir, f"frame_{len(frames)-1:04d}.png"),
+                        format="PNG",
+                    )
 
                     if max_frames and len(frames) >= max_frames:
                         break
@@ -270,6 +276,15 @@ class VideoBackgroundRemover:
         )
 
         print(f"Animated WebP saved to {output_path}")
+
+    def _prepare_animation_frames_dir(self, output_path: str) -> str:
+        """Create a persistent directory for processed animation frames."""
+        output_root, _ = os.path.splitext(output_path)
+        frames_output_dir = f"{output_root}_frames"
+        if os.path.exists(frames_output_dir):
+            shutil.rmtree(frames_output_dir)
+        os.makedirs(frames_output_dir, exist_ok=True)
+        return frames_output_dir
 
     def _build_gif_master_palette(
         self,
@@ -466,85 +481,85 @@ class VideoBackgroundRemover:
         print(f"Video: {total_frames} frames, {video_fps:.2f} fps, {duration:.2f}s")
         print(f"Output: {fps} fps (skip every {frame_skip} frames)")
 
-        temp_root = os.path.dirname(output_path) or "."
         temp_paths = []
+        frames_output_dir = self._prepare_animation_frames_dir(output_path)
+        print(f"Saving processed frames to {frames_output_dir}")
 
-        with tempfile.TemporaryDirectory(prefix="gif_frames_", dir=temp_root) as temp_dir:
-            frame_count = 0
-            saved_count = 0
+        frame_count = 0
+        saved_count = 0
 
-            with tqdm(total=total_frames, desc="Processing") as pbar:
-                while True:
-                    ret, frame = cap.read()
-                    if not ret:
+        with tqdm(total=total_frames, desc="Processing") as pbar:
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+
+                if frame_count % frame_skip == 0:
+                    result = self.remove_background_from_frame(frame)
+                    frame_path = os.path.join(frames_output_dir, f"frame_{saved_count:04d}.png")
+                    Image.fromarray(result).save(frame_path, format="PNG")
+                    temp_paths.append(frame_path)
+                    saved_count += 1
+
+                    if max_frames and saved_count >= max_frames:
                         break
 
-                    if frame_count % frame_skip == 0:
-                        result = self.remove_background_from_frame(frame)
-                        frame_path = os.path.join(temp_dir, f"frame_{saved_count:04d}.png")
-                        Image.fromarray(result).save(frame_path, format="PNG")
-                        temp_paths.append(frame_path)
-                        saved_count += 1
+                frame_count += 1
+                pbar.update(1)
 
-                        if max_frames and saved_count >= max_frames:
-                            break
+        cap.release()
 
-                    frame_count += 1
-                    pbar.update(1)
+        if not temp_paths:
+            raise ValueError("No frames extracted")
 
-            cap.release()
+        print(f"Saving {len(temp_paths)} frames as animated GIF...")
 
-            if not temp_paths:
-                raise ValueError("No frames extracted")
+        sample_count = min(16, len(temp_paths))
+        sample_indices = np.linspace(0, len(temp_paths) - 1, sample_count, dtype=int)
+        sample_frames = []
+        for frame_index in tqdm(
+            sample_indices,
+            desc="Loading GIF palette samples",
+            total=sample_count,
+        ):
+            with Image.open(temp_paths[frame_index]) as sample_frame:
+                sample_frames.append(sample_frame.convert("RGBA"))
 
-            print(f"Saving {len(temp_paths)} frames as animated GIF...")
+        master_palette = self._build_gif_master_palette(
+            sample_frames,
+            transparent_rgb=(255, 0, 255),
+            matte_rgb=(0, 0, 0),
+        )
+        palette_image = Image.new("P", (1, 1))
+        palette_image.putpalette(master_palette)
 
-            sample_count = min(16, len(temp_paths))
-            sample_indices = np.linspace(0, len(temp_paths) - 1, sample_count, dtype=int)
-            sample_frames = []
-            for frame_index in tqdm(
-                sample_indices,
-                desc="Loading GIF palette samples",
-                total=sample_count,
-            ):
-                with Image.open(temp_paths[frame_index]) as sample_frame:
-                    sample_frames.append(sample_frame.convert("RGBA"))
-
-            master_palette = self._build_gif_master_palette(
-                sample_frames,
-                transparent_rgb=(255, 0, 255),
-                matte_rgb=(0, 0, 0),
-            )
-            palette_image = Image.new("P", (1, 1))
-            palette_image.putpalette(master_palette)
-
-            gif_frames = []
-            for frame_path in tqdm(
-                temp_paths,
-                desc="Converting GIF frames",
-                total=len(temp_paths),
-            ):
-                with Image.open(frame_path) as rgba_frame:
-                    gif_frames.append(
-                        self._convert_rgba_frame_to_gif(
-                            rgba_frame.convert("RGBA"),
-                            master_palette=master_palette,
-                            palette_image=palette_image,
-                            matte_rgb=(0, 0, 0),
-                        )
+        gif_frames = []
+        for frame_path in tqdm(
+            temp_paths,
+            desc="Converting GIF frames",
+            total=len(temp_paths),
+        ):
+            with Image.open(frame_path) as rgba_frame:
+                gif_frames.append(
+                    self._convert_rgba_frame_to_gif(
+                        rgba_frame.convert("RGBA"),
+                        master_palette=master_palette,
+                        palette_image=palette_image,
+                        matte_rgb=(0, 0, 0),
                     )
+                )
 
-            gif_frames[0].save(
-                output_path,
-                format="GIF",
-                save_all=True,
-                append_images=gif_frames[1:],
-                duration=duration_ms,
-                loop=0,
-                transparency=0,
-                disposal=2,
-                optimize=False,
-            )
+        gif_frames[0].save(
+            output_path,
+            format="GIF",
+            save_all=True,
+            append_images=gif_frames[1:],
+            duration=duration_ms,
+            loop=0,
+            transparency=0,
+            disposal=2,
+            optimize=False,
+        )
 
         print(f"Animated GIF saved to {output_path}")
 
@@ -591,6 +606,8 @@ class VideoBackgroundRemover:
 
         frames = []
         frame_count = 0
+        frames_output_dir = self._prepare_animation_frames_dir(output_path)
+        print(f"Saving processed frames to {frames_output_dir}")
 
         with tqdm(total=total_frames, desc="Processing") as pbar:
             while True:
@@ -604,6 +621,10 @@ class VideoBackgroundRemover:
                     result_pil = Image.fromarray(result)
 
                     frames.append(result_pil)
+                    result_pil.save(
+                        os.path.join(frames_output_dir, f"frame_{len(frames)-1:04d}.png"),
+                        format="PNG",
+                    )
 
                     if max_frames and len(frames) >= max_frames:
                         break
@@ -657,8 +678,6 @@ class VideoBackgroundRemover:
             keep_frames: Keep intermediate frames
             work_dir: Working directory for frames
         """
-        import shutil
-
         # Setup working directory
         if work_dir is None:
             work_dir = os.path.join(os.path.dirname(output_path), "frames_temp")

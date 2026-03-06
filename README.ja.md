@@ -127,6 +127,18 @@ python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames
 | `u2net_human_seg` | 人物セグメンテーション向け |
 | `silueta` | 高品質寄りだが遅め |
 
+## 炎エフェクト比較
+
+検証素材: `assets/onizuka_fire_motion.mp4`
+
+| Model | WebP | メモ |
+| --- | --- | --- |
+| `isnet-general-use` | <img src="example/onizuka_fire_motion_isnet-general-use.webp" alt="isnet-general-use preview" width="180"> | 炎の成分を少し残すが、周囲にノイズも出やすい |
+| `u2net` | <img src="example/onizuka_fire_motion_u2net.webp" alt="u2net preview" width="180"> | 人物の形は安定するが、炎のオーラはかなり消える |
+| `u2netp` | <img src="example/onizuka_fire_motion_u2netp.webp" alt="u2netp preview" width="180"> | 最速だが、複雑なフレームで崩れやすい |
+| `u2net_human_seg` | <img src="example/onizuka_fire_motion_u2net_human_seg.webp" alt="u2net_human_seg preview" width="180"> | この素材では人物抽出が崩れて不向き |
+| `silueta` | <img src="example/onizuka_fire_motion_silueta.webp" alt="silueta preview" width="180"> | この比較では一番バランスが良い |
+
 ## 🖼️ Output Examples
 
 - 入力動画: `assets/onizuka_idle_motion.mp4`

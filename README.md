@@ -127,6 +127,18 @@ With `--animated both`, the tool writes both `.webp` and `.gif` using the same b
 | `u2net_human_seg` | Optimized for human segmentation |
 | `silueta` | Higher quality but slower |
 
+## Fire Effect Comparison
+
+Test clip: `assets/onizuka_fire_motion.mp4`
+
+| Model | Preview | Notes |
+| --- | --- | --- |
+| `isnet-general-use` | <img src="example/onizuka_fire_motion_isnet-general-use.webp" alt="isnet-general-use preview" width="180"> | Keeps some effect detail, but halo noise remains around the subject |
+| `u2net` | <img src="example/onizuka_fire_motion_u2net.webp" alt="u2net preview" width="180"> | Stable silhouette, but removes most of the fire aura |
+| `u2netp` | <img src="example/onizuka_fire_motion_u2netp.webp" alt="u2netp preview" width="180"> | Fastest, but quality drops on complex fire frames |
+| `u2net_human_seg` | <img src="example/onizuka_fire_motion_u2net_human_seg.webp" alt="u2net_human_seg preview" width="180"> | Not suitable for this effect-heavy clip |
+| `silueta` | <img src="example/onizuka_fire_motion_silueta.webp" alt="silueta preview" width="180"> | Best overall balance for this sample |
+
 ## 🖼️ Output Examples
 
 - Input video: `assets/onizuka_idle_motion.mp4`

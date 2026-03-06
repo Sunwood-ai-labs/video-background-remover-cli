@@ -316,9 +316,10 @@ class VideoBackgroundRemover:
                     result = self.remove_background_from_frame(frame)
                     result_pil = Image.fromarray(result)
 
-                    # For GIF, convert RGBA to P mode with transparency
+                    # For GIF, properly handle transparency
                     if format == "gif":
-                        result_pil = result_pil.convert("P", palette=Image.ADAPTIVE)
+                        # Keep RGBA for now, will convert when saving
+                        pass
 
                     frames.append(result_pil)
 
@@ -351,8 +352,18 @@ class VideoBackgroundRemover:
             save_kwargs["lossless"] = False
             save_kwargs["quality"] = 85
         elif format == "gif":
+            # For GIF, convert RGBA frames to P with proper transparency
+            gif_frames = []
+            for frame in frames:
+                # Convert RGBA to P with transparency
+                alpha = frame.split()[-1]  # Get alpha channel
+                frame_p = frame.convert("RGB").convert("P", palette=Image.ADAPTIVE, colors=255)
+                # Set transparency based on alpha
+                frame_p.info["transparency"] = 0
+                gif_frames.append(frame_p)
+            frames = gif_frames
+            save_kwargs["append_images"] = frames[1:]
             save_kwargs["optimize"] = True
-            save_kwargs["transparency"] = 0
 
         frames[0].save(output_path, format=format_upper, **save_kwargs)
 

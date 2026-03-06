@@ -1,0 +1,14 @@
+# Background Removal (RMBG-1.4 - same as Xenova/remove-background-web)
+rembg>=2.0.50
+
+# Video Processing
+opencv-python>=4.8.0
+
+# Core
+numpy>=1.24.0
+Pillow>=10.0.0
+tqdm>=4.65.0
+
+# ONNX Runtime (choose one)
+onnxruntime>=1.16.0          # CPU (default)
+# onnxruntime-gpu>=1.16.0    # GPU (uncomment if you have CUDA)

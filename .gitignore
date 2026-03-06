@@ -51,6 +51,8 @@ output_frames*/
 frames_temp/
 !example/
 !example/output_animated.webp
+!docs/public/media/output_animated.webp
+!docs/public/favicon.ico
 
 # uv
 uv.lock

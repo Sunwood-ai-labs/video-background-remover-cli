@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>Video Background Remover</h1>
+  <h1>Video Background Remover CLI</h1>
   <img src="example/output_animated.webp" alt="Header image" width="320">
   <p>
     <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
@@ -18,7 +18,7 @@
 
 A Python CLI tool that removes backgrounds from videos using `rembg` and `OpenCV`. It supports full video export, transparent frame extraction, and animated WebP / GIF generation.
 
-## Features
+## ✨ Features
 
 - Split a video into frames, remove the background, and rebuild it as a video
 - Export transparent `webp` / `png` frames at fixed intervals
@@ -26,13 +26,13 @@ A Python CLI tool that removes backgrounds from videos using `rembg` and `OpenCV
 - Replace the removed background with a solid color or background image
 - Switch between `isnet-general-use`, `u2net`, `u2netp`, `u2net_human_seg`, and `silueta`
 
-## Requirements
+## 📋 Requirements
 
 - Python 3.10 or later
 - FFmpeg is not required
 - The model is downloaded on first run
 
-## Setup
+## 🛠️ Setup
 
 ### With `pip`
 
@@ -46,7 +46,7 @@ pip install -r requirements.txt
 uv sync
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
 ### 1. Export a video with a white background
 
@@ -66,7 +66,7 @@ python main.py assets/onizuka_idle_motion.mp4 output/output_animated.webp --anim
 python main.py assets/onizuka_idle_motion.mp4 output/frames --interval 1 --format webp
 ```
 
-## Usage
+## 💡 Usage
 
 ```bash
 python main.py INPUT OUTPUT [options]
@@ -101,7 +101,7 @@ python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames
 
 With `--animated both`, the tool writes both `.webp` and `.gif` using the same base name.
 
-## Options
+## ⚙️ Options
 
 | Option | Description |
 | --- | --- |
@@ -117,7 +117,7 @@ With `--animated both`, the tool writes both `.webp` and `.gif` using the same b
 | `--webp-fps` | FPS for animated output |
 | `--max-frames` | Maximum number of frames for animated output |
 
-## Models
+## 🧠 Models
 
 | Model | Description |
 | --- | --- |
@@ -127,7 +127,7 @@ With `--animated both`, the tool writes both `.webp` and `.gif` using the same b
 | `u2net_human_seg` | Optimized for human segmentation |
 | `silueta` | Higher quality but slower |
 
-## Output Examples
+## 🖼️ Output Examples
 
 - Input video: `assets/onizuka_idle_motion.mp4`
 - Animated WebP: `example/output_animated.webp`
@@ -142,7 +142,7 @@ With `--animated both`, the tool writes both `.webp` and `.gif` using the same b
 | --- | --- |
 | ![GIF comparison](example/onizuka_walk_motion.gif) | ![WebP comparison](example/onizuka_walk_motion.webp) |
 
-## Notes
+## 📝 Notes
 
 - The initial model load can take some time
 - Long videos exported as `--animated gif` can become large

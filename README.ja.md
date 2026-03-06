@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>Video Background Remover</h1>
+  <h1>Video Background Remover CLI</h1>
   <img src="example/output_animated.webp" alt="Header image" width="320">
   <p>
     <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
@@ -18,7 +18,7 @@
 
 動画から被写体の背景を除去する Python CLI ツールです。`rembg` と `OpenCV` を使って、通常の動画書き出し、透過付きフレーム書き出し、アニメーション WebP / GIF 生成を行えます。
 
-## Features
+## ✨ Features
 
 - 動画をフレーム分解して背景除去し、動画として再構成
 - 一定間隔ごとに透過 `webp` / `png` フレームを書き出し
@@ -26,13 +26,13 @@
 - 単色背景または背景画像への差し替えに対応
 - `isnet-general-use` / `u2net` / `u2netp` / `u2net_human_seg` / `silueta` を切り替え可能
 
-## Requirements
+## 📋 Requirements
 
 - Python 3.10 以上
 - FFmpeg 不要
 - 初回実行時はモデルのダウンロードが発生します
 
-## Setup
+## 🛠️ Setup
 
 ### `pip` を使う場合
 
@@ -46,7 +46,7 @@ pip install -r requirements.txt
 uv sync
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
 ### 1. 背景を白で埋めた動画を出力
 
@@ -66,7 +66,7 @@ python main.py assets/onizuka_idle_motion.mp4 output/output_animated.webp --anim
 python main.py assets/onizuka_idle_motion.mp4 output/frames --interval 1 --format webp
 ```
 
-## Usage
+## 💡 Usage
 
 ```bash
 python main.py INPUT OUTPUT [options]
@@ -101,7 +101,7 @@ python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames
 
 `--animated both` を指定すると、同じベース名で `.webp` と `.gif` の両方を出力します。
 
-## Options
+## ⚙️ Options
 
 | Option | Description |
 | --- | --- |
@@ -117,7 +117,7 @@ python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames
 | `--webp-fps` | アニメーション出力時の FPS |
 | `--max-frames` | アニメーション出力時の最大フレーム数 |
 
-## Models
+## 🧠 Models
 
 | Model | Description |
 | --- | --- |
@@ -127,7 +127,7 @@ python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames
 | `u2net_human_seg` | 人物セグメンテーション向け |
 | `silueta` | 高品質寄りだが遅め |
 
-## Output Examples
+## 🖼️ Output Examples
 
 - 入力動画: `assets/onizuka_idle_motion.mp4`
 - アニメーション WebP: `example/output_animated.webp`
@@ -142,7 +142,7 @@ python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames
 | --- | --- |
 | ![GIF comparison](example/onizuka_walk_motion.gif) | ![WebP comparison](example/onizuka_walk_motion.webp) |
 
-## Notes
+## 📝 Notes
 
 - モデルの初回ロードには時間がかかります
 - 長い動画を `--animated gif` で出力するとファイルサイズが大きくなります

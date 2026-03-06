@@ -131,6 +131,12 @@ With `--animated both`, the tool writes both `.webp` and `.gif` using the same b
 
 Test clip: `assets/onizuka_fire_motion.mp4`
 
+Test settings:
+
+```bash
+python main.py assets/onizuka_fire_motion.mp4 output/model.webp --animated webp --webp-fps 8 --model <model>
+```
+
 | Model | Preview | Notes |
 | --- | --- | --- |
 | `isnet-general-use` | <img src="example/onizuka_fire_motion_isnet-general-use.webp" alt="isnet-general-use preview" width="180"> | Keeps some effect detail, but halo noise remains around the subject |
@@ -138,6 +144,18 @@ Test clip: `assets/onizuka_fire_motion.mp4`
 | `u2netp` | <img src="example/onizuka_fire_motion_u2netp.webp" alt="u2netp preview" width="180"> | Fastest, but quality drops on complex fire frames |
 | `u2net_human_seg` | <img src="example/onizuka_fire_motion_u2net_human_seg.webp" alt="u2net_human_seg preview" width="180"> | Not suitable for this effect-heavy clip |
 | `silueta` | <img src="example/onizuka_fire_motion_silueta.webp" alt="silueta preview" width="180"> | Best overall balance for this sample |
+
+### Experiment Summary
+
+- `silueta` gave the best overall balance on this clip.
+- `u2net` was the cleanest fallback when you prefer a stable silhouette.
+- `u2net_human_seg` was not suitable for this stylized, effect-heavy sample.
+
+### Visual Comparison
+
+![Comparison sheet](example/onizuka_fire_motion_comparison_sheet.png)
+
+![Mask comparison](example/onizuka_fire_motion_comparison_masks.png)
 
 ## 🖼️ Output Examples
 

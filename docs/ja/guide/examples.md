@@ -7,13 +7,51 @@
 | 入力動画 | `assets/onizuka_idle_motion.mp4` |
 | アニメーション WebP | `example/output_animated.webp` |
 | GIF | `output/output.gif` |
-| 比較用 GIF | `example/onizuka_walk_motion.gif` |
-| 比較用 WebP | `example/onizuka_walk_motion.webp` |
+| 比較 GIF | `example/onizuka_walk_motion.gif` |
+| 比較 WebP | `example/onizuka_walk_motion.webp` |
 | 透過フレーム | `output_frames_webp/` |
+
+## 実験: 炎エフェクト付き動画
+
+検証素材: `assets/onizuka_fire_motion.mp4`
+
+使用した設定:
+
+```bash
+python main.py assets/onizuka_fire_motion.mp4 output/model.webp --animated webp --webp-fps 8 --model <model>
+```
+
+### 要点
+
+- この素材では `silueta` が最もバランスの良い結果でした。
+- `u2net` は輪郭が安定しますが、炎のオーラはかなり消えます。
+- `u2net_human_seg` はエフェクトの強いこのサンプルには不向きでした。
+
+### モデル別プレビュー
+
+| Model | WebP | 実行時間 | メモ |
+| --- | --- | ---: | --- |
+| `isnet-general-use` | <img src="/experiments/onizuka_fire_motion/isnet-general-use.webp" alt="isnet-general-use result" width="180"> | 114.44s | 炎の成分を少し残す一方で、輪郭まわりにノイズも残ります。 |
+| `u2net` | <img src="/experiments/onizuka_fire_motion/u2net.webp" alt="u2net result" width="180"> | 76.42s | シルエットは安定しますが、炎のオーラはほぼ消えます。 |
+| `u2netp` | <img src="/experiments/onizuka_fire_motion/u2netp.webp" alt="u2netp result" width="180"> | 30.11s | 最速ですが、難しいフレームで崩れやすいです。 |
+| `u2net_human_seg` | <img src="/experiments/onizuka_fire_motion/u2net_human_seg.webp" alt="u2net human seg result" width="180"> | 69.97s | このスタイライズされた動画では人物自体を大きく落とします。 |
+| `silueta` | <img src="/experiments/onizuka_fire_motion/silueta.webp" alt="silueta result" width="180"> | 69.27s | 形状維持とノイズ抑制のバランスが最も良好でした。 |
+
+### フレーム比較シート
+
+![Comparison sheet](/experiments/onizuka_fire_motion/comparison_sheet.png)
+
+1.0s、3.0s、5.0s、7.0s、9.0s の代表フレームを並べています。どのタイミングで炎が消えるか、どこで被写体が崩れるかをまとめて確認できます。
+
+### マスク比較シート
+
+![Mask comparison](/experiments/onizuka_fire_motion/comparison_masks.png)
+
+アルファマスクを見ると、`u2net_human_seg` がこの素材では大きく崩れている一方で、`silueta`、`u2net`、`isnet-general-use` は被写体の面積を比較的維持しています。
 
 ## レシピ: 白背景の動画
 
-背景を白で埋めた動画を出力します。
+背景を除去して白で埋めた動画を書き出します。
 
 ```bash
 python main.py input.mp4 output_white.mp4 --bg-color white
@@ -21,7 +59,7 @@ python main.py input.mp4 output_white.mp4 --bg-color white
 
 ## レシピ: 背景画像の合成
 
-任意の背景画像を合成します。
+任意の背景画像へ被写体を合成します。
 
 ```bash
 python main.py input.mp4 output_bg.mp4 --bg-image background.jpg
@@ -37,7 +75,7 @@ python main.py input.mp4 output_animated.webp --animated webp --webp-fps 10
 
 ## レシピ: アニメーション GIF
 
-GIF を出力します（GIF は半透明をサポートしていません）。
+GIF を出力します。GIF は半透明を保持できません。
 
 ```bash
 python main.py input.mp4 output.gif --animated gif --webp-fps 8
@@ -45,7 +83,7 @@ python main.py input.mp4 output.gif --animated gif --webp-fps 8
 
 ## レシピ: WebP と GIF の同時出力
 
-1 回の実行で両方のフォーマットを出力します。
+1 回の実行で両方の形式を書き出します。
 
 ```bash
 python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames 120
@@ -53,28 +91,28 @@ python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames
 
 ## レシピ: フレーム抽出
 
-0.5 秒ごとに透過 PNG フレームを抽出します。
+0.5 秒ごとに透過 PNG フレームを書き出します。
 
 ```bash
 python main.py input.mp4 output/frames --interval 0.5 --format png
 ```
 
-1 秒ごとに透過 WebP フレームを抽出します。
+1 秒ごとに透過 WebP フレームを書き出します。
 
 ```bash
 python main.py input.mp4 output/frames --interval 1 --format webp
 ```
 
-## レシピ: モデルの指定
+## レシピ: モデル指定
 
-人物セグメンテーションモデルを使用してより良い結果を得ます。
+人物向けモデルを指定して処理します。
 
 ```bash
 python main.py input.mp4 output.mp4 --model u2net_human_seg --bg-color white
 ```
 
-## 注意事項
+## 注意
 
-- モデルの初回ロードには時間がかかります。
-- 長い動画を `--animated gif` で出力するとファイルサイズが大きくなります。
-- 透過が必要な場合は、通常の動画書き出しよりも `--animated webp` または `--interval` の使用が適しています。
+- モデルの初回読み込みには時間がかかることがあります。
+- 長い動画を `--animated gif` で出力するとファイルサイズが大きくなりやすいです。
+- 透過を使いたい場合は通常動画よりも `--animated webp` または `--interval` 出力が向いています。

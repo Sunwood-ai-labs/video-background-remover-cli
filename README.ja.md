@@ -131,6 +131,12 @@ python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames
 
 検証素材: `assets/onizuka_fire_motion.mp4`
 
+使用した設定:
+
+```bash
+python main.py assets/onizuka_fire_motion.mp4 output/model.webp --animated webp --webp-fps 8 --model <model>
+```
+
 | Model | WebP | メモ |
 | --- | --- | --- |
 | `isnet-general-use` | <img src="example/onizuka_fire_motion_isnet-general-use.webp" alt="isnet-general-use preview" width="180"> | 炎の成分を少し残すが、周囲にノイズも出やすい |
@@ -138,6 +144,18 @@ python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames
 | `u2netp` | <img src="example/onizuka_fire_motion_u2netp.webp" alt="u2netp preview" width="180"> | 最速だが、複雑なフレームで崩れやすい |
 | `u2net_human_seg` | <img src="example/onizuka_fire_motion_u2net_human_seg.webp" alt="u2net_human_seg preview" width="180"> | この素材では人物抽出が崩れて不向き |
 | `silueta` | <img src="example/onizuka_fire_motion_silueta.webp" alt="silueta preview" width="180"> | この比較では一番バランスが良い |
+
+### 実験のまとめ
+
+- この素材では `silueta` が最もバランスの良い結果でした。
+- 輪郭を安定させたいなら `u2net` が次点候補です。
+- `u2net_human_seg` はエフェクトの強いこのサンプルには向いていません。
+
+### 比較画像
+
+![Comparison sheet](example/onizuka_fire_motion_comparison_sheet.png)
+
+![Mask comparison](example/onizuka_fire_motion_comparison_masks.png)
 
 ## 🖼️ Output Examples
 

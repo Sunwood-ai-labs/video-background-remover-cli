@@ -3,7 +3,7 @@
 
 # Video Background Remover
 
-![Header image](output/output_animated.webp)
+![Header image](example/output_animated.webp)
 
 動画から被写体の背景を除去する Python CLI ツールです。`rembg` と `OpenCV` を使って、通常の動画書き出し、透過付きフレーム書き出し、アニメーション WebP / GIF 生成を行えます。
 
@@ -119,7 +119,7 @@ python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames
 ## Output Examples
 
 - 入力動画: `assets/onizuka_idle_motion.mp4`
-- アニメーション WebP: `output/output_animated.webp`
+- アニメーション WebP: `example/output_animated.webp`
 - GIF: `output/output.gif`
 - 透過フレーム: `output_frames_webp/`
 

@@ -49,6 +49,8 @@ output*.webp
 output*.gif
 output_frames*/
 frames_temp/
+!example/
+!example/output_animated.webp
 
 # uv
 uv.lock

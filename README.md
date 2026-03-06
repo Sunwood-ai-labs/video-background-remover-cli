@@ -3,7 +3,7 @@
 
 # Video Background Remover
 
-![Header image](output/output_animated.webp)
+![Header image](example/output_animated.webp)
 
 A Python CLI tool that removes backgrounds from videos using `rembg` and `OpenCV`. It supports full video export, transparent frame extraction, and animated WebP / GIF generation.
 
@@ -119,7 +119,7 @@ With `--animated both`, the tool writes both `.webp` and `.gif` using the same b
 ## Output Examples
 
 - Input video: `assets/onizuka_idle_motion.mp4`
-- Animated WebP: `output/output_animated.webp`
+- Animated WebP: `example/output_animated.webp`
 - GIF: `output/output.gif`
 - Transparent frames: `output_frames_webp/`
 

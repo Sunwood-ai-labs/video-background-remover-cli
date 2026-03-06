@@ -11,6 +11,7 @@ Process flow:
 """
 
 import os
+import tempfile
 import cv2
 import numpy as np
 from PIL import Image
@@ -270,6 +271,283 @@ class VideoBackgroundRemover:
 
         print(f"Animated WebP saved to {output_path}")
 
+    def _build_gif_master_palette(
+        self,
+        frames: list[Image.Image],
+        transparent_rgb: tuple[int, int, int],
+        matte_rgb: tuple[int, int, int],
+    ) -> list[int]:
+        """Build a shared GIF palette with index 0 reserved for transparency."""
+        sample_count = min(16, len(frames))
+        sample_indices = np.linspace(0, len(frames) - 1, sample_count, dtype=int)
+
+        sample_width = max(1, min(frames[0].width, 128))
+        sample_height = max(1, min(frames[0].height, 128))
+        columns = min(4, sample_count)
+        rows = int(np.ceil(sample_count / columns))
+
+        palette_sheet = Image.new(
+            "RGB", (columns * sample_width, rows * sample_height), matte_rgb
+        )
+        matte_rgba = matte_rgb + (255,)
+
+        for sheet_index, frame_index in enumerate(sample_indices):
+            row = sheet_index // columns
+            col = sheet_index % columns
+
+            composited = Image.alpha_composite(
+                Image.new("RGBA", frames[frame_index].size, matte_rgba),
+                frames[frame_index],
+            ).convert("RGB")
+            composited = composited.resize((sample_width, sample_height))
+            palette_sheet.paste(composited, (col * sample_width, row * sample_height))
+
+        palette_source = palette_sheet.quantize(colors=255, dither=Image.Dither.NONE)
+        source_palette = palette_source.getpalette()[: 255 * 3]
+
+        master_palette = list(transparent_rgb)
+        master_palette.extend(source_palette)
+        master_palette.extend([0] * (768 - len(master_palette)))
+        return master_palette[:768]
+
+    def _convert_rgba_frames_to_gif(
+        self,
+        frames: list[Image.Image],
+        matte_rgb: tuple[int, int, int] = (0, 0, 0),
+        transparent_rgb: tuple[int, int, int] = (255, 0, 255),
+        alpha_threshold: int = 8,
+    ) -> list[Image.Image]:
+        """Convert RGBA frames into palette GIF frames with a stable transparent index."""
+        master_palette = self._build_gif_master_palette(
+            frames, transparent_rgb=transparent_rgb, matte_rgb=matte_rgb
+        )
+        palette_image = Image.new("P", (1, 1))
+        palette_image.putpalette(master_palette)
+
+        matte_rgba = matte_rgb + (255,)
+        palette_array = np.array(master_palette, dtype=np.int16).reshape(256, 3)
+        opaque_palette = palette_array[1:]
+
+        gif_frames = []
+        for frame in frames:
+            alpha = np.array(frame.getchannel("A"), dtype=np.uint8)
+            transparent_mask = alpha <= alpha_threshold
+
+            composited = Image.alpha_composite(
+                Image.new("RGBA", frame.size, matte_rgba), frame
+            ).convert("RGB")
+            quantized = composited.quantize(
+                palette=palette_image, dither=Image.Dither.NONE
+            )
+
+            frame_indices = np.array(quantized, dtype=np.uint8)
+            frame_indices[transparent_mask] = 0
+
+            # Reassign any opaque pixels that accidentally landed on the transparent index.
+            opaque_zero_mask = (~transparent_mask) & (frame_indices == 0)
+            if np.any(opaque_zero_mask):
+                rgb_pixels = np.array(composited, dtype=np.uint8)[opaque_zero_mask]
+                unique_colors, inverse = np.unique(
+                    rgb_pixels.reshape(-1, 3), axis=0, return_inverse=True
+                )
+                distances = (
+                    (
+                        unique_colors[:, None, :].astype(np.int32)
+                        - opaque_palette[None, :, :].astype(np.int32)
+                    )
+                    ** 2
+                ).sum(axis=2)
+                nearest_palette_indices = (
+                    np.argmin(distances, axis=1).astype(np.uint8) + 1
+                )
+                frame_indices[opaque_zero_mask] = nearest_palette_indices[inverse]
+
+            gif_frame = Image.fromarray(frame_indices, mode="P")
+            gif_frame.putpalette(master_palette)
+            gif_frame.info["transparency"] = 0
+            gif_frame.info["disposal"] = 2
+            gif_frames.append(gif_frame)
+
+        return gif_frames
+
+    def _convert_rgba_frame_to_gif(
+        self,
+        frame: Image.Image,
+        master_palette: list[int],
+        palette_image: Image.Image,
+        matte_rgb: tuple[int, int, int] = (0, 0, 0),
+        alpha_threshold: int = 8,
+    ) -> Image.Image:
+        """Convert one RGBA frame into a palette GIF frame."""
+        matte_rgba = matte_rgb + (255,)
+        palette_array = np.array(master_palette, dtype=np.int16).reshape(256, 3)
+        opaque_palette = palette_array[1:]
+
+        alpha = np.array(frame.getchannel("A"), dtype=np.uint8)
+        transparent_mask = alpha <= alpha_threshold
+
+        composited = Image.alpha_composite(
+            Image.new("RGBA", frame.size, matte_rgba), frame
+        ).convert("RGB")
+        quantized = composited.quantize(
+            palette=palette_image, dither=Image.Dither.NONE
+        )
+
+        frame_indices = np.array(quantized, dtype=np.uint8)
+        frame_indices[transparent_mask] = 0
+
+        # Reassign any opaque pixels that accidentally landed on the transparent index.
+        opaque_zero_mask = (~transparent_mask) & (frame_indices == 0)
+        if np.any(opaque_zero_mask):
+            rgb_pixels = np.array(composited, dtype=np.uint8)[opaque_zero_mask]
+            unique_colors, inverse = np.unique(
+                rgb_pixels.reshape(-1, 3), axis=0, return_inverse=True
+            )
+            distances = (
+                (
+                    unique_colors[:, None, :].astype(np.int32)
+                    - opaque_palette[None, :, :].astype(np.int32)
+                )
+                ** 2
+            ).sum(axis=2)
+            nearest_palette_indices = (
+                np.argmin(distances, axis=1).astype(np.uint8) + 1
+            )
+            frame_indices[opaque_zero_mask] = nearest_palette_indices[inverse]
+
+        gif_frame = Image.fromarray(frame_indices, mode="P")
+        gif_frame.putpalette(master_palette)
+        gif_frame.info["transparency"] = 0
+        gif_frame.info["disposal"] = 2
+        return gif_frame
+
+    def _save_animated_gif(
+        self,
+        frames: list[Image.Image],
+        output_path: str,
+        duration_ms: int,
+    ):
+        """Save frames as animated GIF using a dedicated pipeline."""
+        gif_frames = self._convert_rgba_frames_to_gif(frames)
+        gif_frames[0].save(
+            output_path,
+            format="GIF",
+            save_all=True,
+            append_images=gif_frames[1:],
+            duration=duration_ms,
+            loop=0,
+            transparency=0,
+            disposal=2,
+            optimize=False,
+        )
+
+        print(f"Animated GIF saved to {output_path}")
+
+    def to_animated_gif(
+        self,
+        video_path: str,
+        output_path: str,
+        fps: int = 10,
+        max_frames: int = None,
+    ):
+        """Convert video to animated GIF with a GIF-specific low-memory pipeline."""
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise ValueError(f"Cannot open video: {video_path}")
+
+        video_fps = cap.get(cv2.CAP_PROP_FPS)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        duration = total_frames / video_fps
+
+        frame_skip = max(1, int(video_fps / fps))
+        output_fps = video_fps / frame_skip
+        duration_ms = int(1000 / output_fps)
+
+        print(f"Video: {total_frames} frames, {video_fps:.2f} fps, {duration:.2f}s")
+        print(f"Output: {fps} fps (skip every {frame_skip} frames)")
+
+        temp_root = os.path.dirname(output_path) or "."
+        temp_paths = []
+
+        with tempfile.TemporaryDirectory(prefix="gif_frames_", dir=temp_root) as temp_dir:
+            frame_count = 0
+            saved_count = 0
+
+            with tqdm(total=total_frames, desc="Processing") as pbar:
+                while True:
+                    ret, frame = cap.read()
+                    if not ret:
+                        break
+
+                    if frame_count % frame_skip == 0:
+                        result = self.remove_background_from_frame(frame)
+                        frame_path = os.path.join(temp_dir, f"frame_{saved_count:04d}.png")
+                        Image.fromarray(result).save(frame_path, format="PNG")
+                        temp_paths.append(frame_path)
+                        saved_count += 1
+
+                        if max_frames and saved_count >= max_frames:
+                            break
+
+                    frame_count += 1
+                    pbar.update(1)
+
+            cap.release()
+
+            if not temp_paths:
+                raise ValueError("No frames extracted")
+
+            print(f"Saving {len(temp_paths)} frames as animated GIF...")
+
+            sample_count = min(16, len(temp_paths))
+            sample_indices = np.linspace(0, len(temp_paths) - 1, sample_count, dtype=int)
+            sample_frames = []
+            for frame_index in tqdm(
+                sample_indices,
+                desc="Loading GIF palette samples",
+                total=sample_count,
+            ):
+                with Image.open(temp_paths[frame_index]) as sample_frame:
+                    sample_frames.append(sample_frame.convert("RGBA"))
+
+            master_palette = self._build_gif_master_palette(
+                sample_frames,
+                transparent_rgb=(255, 0, 255),
+                matte_rgb=(0, 0, 0),
+            )
+            palette_image = Image.new("P", (1, 1))
+            palette_image.putpalette(master_palette)
+
+            gif_frames = []
+            for frame_path in tqdm(
+                temp_paths,
+                desc="Converting GIF frames",
+                total=len(temp_paths),
+            ):
+                with Image.open(frame_path) as rgba_frame:
+                    gif_frames.append(
+                        self._convert_rgba_frame_to_gif(
+                            rgba_frame.convert("RGBA"),
+                            master_palette=master_palette,
+                            palette_image=palette_image,
+                            matte_rgb=(0, 0, 0),
+                        )
+                    )
+
+            gif_frames[0].save(
+                output_path,
+                format="GIF",
+                save_all=True,
+                append_images=gif_frames[1:],
+                duration=duration_ms,
+                loop=0,
+                transparency=0,
+                disposal=2,
+                optimize=False,
+            )
+
+        print(f"Animated GIF saved to {output_path}")
+
     def to_animated(
         self,
         video_path: str,
@@ -287,6 +565,15 @@ class VideoBackgroundRemover:
             max_frames: Maximum number of frames (optional)
             format: Output format - "webp" or "gif"
         """
+        if format == "gif":
+            self.to_animated_gif(
+                video_path=video_path,
+                output_path=output_path,
+                fps=fps,
+                max_frames=max_frames,
+            )
+            return
+
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             raise ValueError(f"Cannot open video: {video_path}")
@@ -316,11 +603,6 @@ class VideoBackgroundRemover:
                     result = self.remove_background_from_frame(frame)
                     result_pil = Image.fromarray(result)
 
-                    # For GIF, properly handle transparency
-                    if format == "gif":
-                        # Keep RGBA for now, will convert when saving
-                        pass
-
                     frames.append(result_pil)
 
                     if max_frames and len(frames) >= max_frames:
@@ -341,50 +623,18 @@ class VideoBackgroundRemover:
         format_upper = format.upper()
         print(f"Saving {len(frames)} frames as animated {format_upper}...")
 
-        save_kwargs = {
-            "save_all": True,
-            "append_images": frames[1:],
-            "duration": duration_ms,
-            "loop": 0,  # 0 = infinite loop
-        }
-
         if format == "webp":
-            save_kwargs["lossless"] = False
-            save_kwargs["quality"] = 85
-        elif format == "gif":
-            # For GIF, need special handling for transparency
-            # Method: Put transparent pixels to WHITE, then set white as transparent index
-            gif_frames = []
-            for frame in frames:
-                # Get alpha channel
-                alpha = frame.split()[-1]
-
-                # Create RGB image from the frame
-                frame_rgb = frame.convert("RGB")
-
-                # Create a mask for transparent pixels (alpha < 128)
-                transparent_mask = alpha.point(lambda x: 255 if x < 128 else 0)
-
-                # Put transparent pixels to WHITE (255, 255, 255)
-                frame_rgb.paste((255, 255, 255), mask=transparent_mask)
-
-                # Convert to palette mode
-                frame_p = frame_rgb.convert("P", palette=Image.ADAPTIVE, colors=255)
-
-                # Find the index of white color and set it as transparent
-                # White is typically at a specific index in the palette
-                frame_p.info["transparency"] = frame_p.getpixel((0, 0))  # Use top-left pixel as transparent
-
-                gif_frames.append(frame_p)
-
-            frames = gif_frames
-            save_kwargs["append_images"] = frames[1:]
-            save_kwargs["optimize"] = True
-            save_kwargs["disposal"] = 1  # Do Not Dispose - keeps full frame
-
-        frames[0].save(output_path, format=format_upper, **save_kwargs)
-
-        print(f"Animated {format_upper} saved to {output_path}")
+            frames[0].save(
+                output_path,
+                format=format_upper,
+                save_all=True,
+                append_images=frames[1:],
+                duration=duration_ms,
+                loop=0,  # 0 = infinite loop
+                lossless=False,
+                quality=85,
+            )
+            print(f"Animated {format_upper} saved to {output_path}")
 
     def process_video(
         self,

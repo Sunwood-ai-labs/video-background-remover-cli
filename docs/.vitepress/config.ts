@@ -57,7 +57,6 @@ export default defineConfig({
   },
 
   themeConfig: {
-    logo: '/logo.png',
     socialLinks: [
       {
         icon: 'github',

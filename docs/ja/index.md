@@ -5,9 +5,6 @@ hero:
   name: Video Background Remover CLI
   text: 動画背景を簡単に除去
   tagline: rembg と OpenCV を使って動画から背景を除去する Python CLI ツール
-  image:
-    src: /hero.webp
-    alt: Video Background Remover CLI デモ
   actions:
     - theme: brand
       text: はじめる

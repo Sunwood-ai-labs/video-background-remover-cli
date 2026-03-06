@@ -5,9 +5,6 @@ hero:
   name: Video Background Remover CLI
   text: Remove video backgrounds with ease
   tagline: A Python CLI tool powered by rembg and OpenCV for background removal from videos
-  image:
-    src: /hero.webp
-    alt: Video Background Remover CLI demo
   actions:
     - theme: brand
       text: Get Started

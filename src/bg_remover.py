@@ -352,19 +352,33 @@ class VideoBackgroundRemover:
             save_kwargs["lossless"] = False
             save_kwargs["quality"] = 85
         elif format == "gif":
-            # For GIF, convert RGBA frames to P with proper transparency
+            # For GIF, need special handling for transparency
+            # Method: Create a proper palette with transparency as first color
             gif_frames = []
             for frame in frames:
-                # Convert RGBA to P with transparency
-                alpha = frame.split()[-1]  # Get alpha channel
-                frame_p = frame.convert("RGB").convert("P", palette=Image.ADAPTIVE, colors=255)
-                # Set transparency based on alpha
-                frame_p.info["transparency"] = 0
+                # Get alpha channel
+                alpha = frame.split()[-1]
+
+                # Create RGB image, then convert to P with transparency
+                # Important: Use WEB palette for consistent transparency handling
+                frame_rgb = frame.convert("RGB")
+
+                # Quantize alpha to binary mask (transparent or not)
+                alpha_mask = alpha.point(lambda x: 0 if x < 128 else 255)
+
+                # Put transparent pixels to black (will become transparent index)
+                frame_rgb.paste(0, mask=Image.eval("alpha < 128"))
+
+                # Convert to palette mode
+                frame_p = frame_rgb.convert("P", palette=Image.WEB, colors=255)
+                frame_p.info["transparency"] = 0  # Index 0 is transparent
+
                 gif_frames.append(frame_p)
+
             frames = gif_frames
             save_kwargs["append_images"] = frames[1:]
             save_kwargs["optimize"] = True
-            save_kwargs["disposal"] = 1  # Do Not Dispose - prevents black trails!
+            save_kwargs["disposal"] = 2  # Restore to background - important for transparency!
 
         frames[0].save(output_path, format=format_upper, **save_kwargs)
 

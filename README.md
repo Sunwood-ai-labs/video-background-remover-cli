@@ -1,9 +1,20 @@
-[![English](https://img.shields.io/badge/Language-English-blue.svg)](README.md)
-[![Japanese](https://img.shields.io/badge/%E8%A8%80%E8%AA%9E-%E6%97%A5%E6%9C%AC%E8%AA%9E-lightgrey.svg)](README.ja.md)
-
-# Video Background Remover
-
-![Header image](example/output_animated.webp)
+<div align="center">
+  <h1>Video Background Remover</h1>
+  <img src="example/output_animated.webp" alt="Header image" width="320">
+  <p>
+    <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
+    <img src="https://img.shields.io/badge/OpenCV-4.x-5C3EE8?logo=opencv&logoColor=white" alt="OpenCV 4.x">
+    <img src="https://img.shields.io/badge/rembg-Background%20Removal-0F172A" alt="rembg">
+  </p>
+  <p>
+    <a href="README.md">
+      <img src="https://img.shields.io/badge/Language-English-blue.svg" alt="English">
+    </a>
+    <a href="README.ja.md">
+      <img src="https://img.shields.io/badge/%E8%A8%80%E8%AA%9E-%E6%97%A5%E6%9C%AC%E8%AA%9E-lightgrey.svg" alt="Japanese">
+    </a>
+  </p>
+</div>
 
 A Python CLI tool that removes backgrounds from videos using `rembg` and `OpenCV`. It supports full video export, transparent frame extraction, and animated WebP / GIF generation.
 

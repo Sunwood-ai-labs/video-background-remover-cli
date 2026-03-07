@@ -32,18 +32,24 @@ A Python CLI tool that removes backgrounds from videos using `rembg` and `OpenCV
 - FFmpeg is not required
 - The model is downloaded on first run
 
-## Setup
+## Install
 
-### With `pip`
+### From PyPI
 
 ```bash
-pip install -r requirements.txt
+pip install video-background-remover
+```
+
+### Local development
+
+```bash
+pip install -e ".[dev]"
 ```
 
 ### With `uv`
 
 ```bash
-uv sync
+uv sync --extra dev
 ```
 
 ## Quick Start
@@ -51,33 +57,35 @@ uv sync
 ### 1. Export a video with a white background
 
 ```bash
-python main.py assets/onizuka_idle_motion.mp4 output/output_white.mp4 --bg-color white
+video-background-remover assets/onizuka_idle_motion.mp4 output/output_white.mp4 --bg-color white
 ```
 
 ### 2. Export a transparent animated WebP
 
 ```bash
-python main.py assets/onizuka_idle_motion.mp4 output/output_animated.webp --animated webp --webp-fps 10
+video-background-remover assets/onizuka_idle_motion.mp4 output/output_animated.webp --animated webp --webp-fps 10
 ```
 
 ### 3. Export transparent frames every second
 
 ```bash
-python main.py assets/onizuka_idle_motion.mp4 output/frames --interval 1 --format webp
+video-background-remover assets/onizuka_idle_motion.mp4 output/frames --interval 1 --format webp
 ```
 
 ## Usage
 
 ```bash
-python main.py INPUT OUTPUT [options]
+video-background-remover INPUT OUTPUT [options]
 ```
+
+If you are running directly from the repository, `python main.py ...` and `python -m video_background_remover_cli ...` still work.
 
 ### Full video export
 
 ```bash
-python main.py input.mp4 output.mp4 --bg-color white
-python main.py input.mp4 output.mp4 --bg-image background.jpg
-python main.py input.mp4 output.mp4 --fps 30
+video-background-remover input.mp4 output.mp4 --bg-color white
+video-background-remover input.mp4 output.mp4 --bg-image background.jpg
+video-background-remover input.mp4 output.mp4 --fps 30
 ```
 
 Regular video output does not preserve alpha transparency. If you want a visible background, pass `--bg-color` or `--bg-image`.
@@ -85,8 +93,8 @@ Regular video output does not preserve alpha transparency. If you want a visible
 ### Transparent frame export
 
 ```bash
-python main.py input.mp4 output/frames --interval 0.5 --format webp
-python main.py input.mp4 output/frames --interval 1 --format png
+video-background-remover input.mp4 output/frames --interval 0.5 --format webp
+video-background-remover input.mp4 output/frames --interval 1 --format png
 ```
 
 When `--interval` is set, `OUTPUT` is treated as a directory name instead of a file path.
@@ -94,9 +102,9 @@ When `--interval` is set, `OUTPUT` is treated as a directory name instead of a f
 ### Animated WebP / GIF export
 
 ```bash
-python main.py input.mp4 output/output_animated.webp --animated webp
-python main.py input.mp4 output/output.gif --animated gif --webp-fps 8
-python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames 120
+video-background-remover input.mp4 output/output_animated.webp --animated webp
+video-background-remover input.mp4 output/output.gif --animated gif --webp-fps 8
+video-background-remover input.mp4 output/output --animated both --webp-fps 8 --max-frames 120
 ```
 
 With `--animated both`, the tool writes both `.webp` and `.gif` using the same base name.
@@ -134,7 +142,7 @@ Test clip: `assets/onizuka_fire_motion.mp4`
 Test settings:
 
 ```bash
-python main.py assets/onizuka_fire_motion.mp4 output/model.webp --animated webp --webp-fps 8 --model <model>
+video-background-remover assets/onizuka_fire_motion.mp4 output/model.webp --animated webp --webp-fps 8 --model <model>
 ```
 
 | Model | Preview | Notes |

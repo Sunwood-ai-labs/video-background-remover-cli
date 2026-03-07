@@ -37,13 +37,17 @@
 ### `pip` を使う場合
 
 ```bash
-pip install -r requirements.txt
+pip install video-background-remover
 ```
 
 ### `uv` を使う場合
 
 ```bash
-uv sync
+pip install -e ".[dev]"
+```
+
+```bash
+uv sync --extra dev
 ```
 
 ## 🚀 Quick Start
@@ -51,33 +55,33 @@ uv sync
 ### 1. 背景を白で埋めた動画を出力
 
 ```bash
-python main.py assets/onizuka_idle_motion.mp4 output/output_white.mp4 --bg-color white
+video-background-remover assets/onizuka_idle_motion.mp4 output/output_white.mp4 --bg-color white
 ```
 
 ### 2. 透過付きアニメーション WebP を出力
 
 ```bash
-python main.py assets/onizuka_idle_motion.mp4 output/output_animated.webp --animated webp --webp-fps 10
+video-background-remover assets/onizuka_idle_motion.mp4 output/output_animated.webp --animated webp --webp-fps 10
 ```
 
 ### 3. 1 秒ごとに透過フレームを書き出し
 
 ```bash
-python main.py assets/onizuka_idle_motion.mp4 output/frames --interval 1 --format webp
+video-background-remover assets/onizuka_idle_motion.mp4 output/frames --interval 1 --format webp
 ```
 
 ## 💡 Usage
 
 ```bash
-python main.py INPUT OUTPUT [options]
+video-background-remover INPUT OUTPUT [options]
 ```
 
 ### 通常の動画出力
 
 ```bash
-python main.py input.mp4 output.mp4 --bg-color white
-python main.py input.mp4 output.mp4 --bg-image background.jpg
-python main.py input.mp4 output.mp4 --fps 30
+video-background-remover input.mp4 output.mp4 --bg-color white
+video-background-remover input.mp4 output.mp4 --bg-image background.jpg
+video-background-remover input.mp4 output.mp4 --fps 30
 ```
 
 通常の動画出力ではアルファ付き動画は生成しません。背景を明示したい場合は `--bg-color` または `--bg-image` を指定してください。
@@ -85,8 +89,8 @@ python main.py input.mp4 output.mp4 --fps 30
 ### 透過フレームの書き出し
 
 ```bash
-python main.py input.mp4 output/frames --interval 0.5 --format webp
-python main.py input.mp4 output/frames --interval 1 --format png
+video-background-remover input.mp4 output/frames --interval 0.5 --format webp
+video-background-remover input.mp4 output/frames --interval 1 --format png
 ```
 
 `--interval` を指定すると、`OUTPUT` はファイルではなく出力先ディレクトリ名として扱われます。
@@ -94,9 +98,9 @@ python main.py input.mp4 output/frames --interval 1 --format png
 ### アニメーション WebP / GIF 出力
 
 ```bash
-python main.py input.mp4 output/output_animated.webp --animated webp
-python main.py input.mp4 output/output.gif --animated gif --webp-fps 8
-python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames 120
+video-background-remover input.mp4 output/output_animated.webp --animated webp
+video-background-remover input.mp4 output/output.gif --animated gif --webp-fps 8
+video-background-remover input.mp4 output/output --animated both --webp-fps 8 --max-frames 120
 ```
 
 `--animated both` を指定すると、同じベース名で `.webp` と `.gif` の両方を出力します。
@@ -134,7 +138,7 @@ python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames
 使用した設定:
 
 ```bash
-python main.py assets/onizuka_fire_motion.mp4 output/model.webp --animated webp --webp-fps 8 --model <model>
+video-background-remover assets/onizuka_fire_motion.mp4 output/model.webp --animated webp --webp-fps 8 --model <model>
 ```
 
 | Model | WebP | メモ |

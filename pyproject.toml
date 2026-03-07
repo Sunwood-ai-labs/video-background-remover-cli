@@ -1,7 +1,12 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "video-background-remover-cli"
-version = "0.1.0"
-description = "Remove background from video using RMBG-1.4"
+name = "video-background-remover"
+version = "0.1.1"
+description = "CLI tool to remove video backgrounds with rembg and OpenCV"
+readme = { file = "README.pypi.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
 dependencies = [
     "rembg>=2.0.50",
@@ -11,3 +16,37 @@ dependencies = [
     "tqdm>=4.65.0",
     "onnxruntime>=1.16.0",
 ]
+keywords = ["video", "background-removal", "cli", "rembg", "opencv"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.optional-dependencies]
+dev = [
+    "build>=1.2.2",
+    "twine>=6.1.0",
+]
+
+[project.scripts]
+video-background-remover = "video_background_remover_cli.cli:main"
+vbr = "video_background_remover_cli.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/sunwood-ai-labs/video-background-remover-cli"
+Documentation = "https://sunwood-ai-labs.github.io/video-background-remover-cli/"
+Repository = "https://github.com/sunwood-ai-labs/video-background-remover-cli"
+Issues = "https://github.com/sunwood-ai-labs/video-background-remover-cli/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

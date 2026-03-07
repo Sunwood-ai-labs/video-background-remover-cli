@@ -1,6 +1,6 @@
 # Video Background Remover CLI
 
-<img src="https://github.com/Sunwood-ai-labs/video-background-remover-cli/blob/main/example/output_animated.webp" alt="Header image" width="320">
+<img src="https://raw.githubusercontent.com/Sunwood-ai-labs/video-background-remover-cli/main/example/output_animated.gif" alt="Header image" width="320">
 
 `video-background-remover` is a Python CLI package for removing video backgrounds with `rembg` and `OpenCV`.
 

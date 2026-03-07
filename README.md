@@ -1,6 +1,6 @@
 <div align="center">
   <h1>Video Background Remover CLI</h1>
-  <img src="https://github.com/Sunwood-ai-labs/video-background-remover-cli/blob/main/example/output_animated.webp" alt="Header image" width="320">
+  <img src="https://raw.githubusercontent.com/Sunwood-ai-labs/video-background-remover-cli/main/example/output_animated.gif" alt="Header image" width="320">
   <p>
     <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
     <img src="https://img.shields.io/badge/OpenCV-4.x-5C3EE8?logo=opencv&logoColor=white" alt="OpenCV 4.x">

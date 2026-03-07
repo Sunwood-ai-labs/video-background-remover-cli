@@ -41,7 +41,11 @@ export default defineConfig({
   base: siteBase,
   lang: 'en-US',
   dir: 'ltr',
-  head: [['meta', { name: 'theme-color', content: '#f25d27' }]],
+  head: [
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: `${siteBase}favicon.svg` }],
+    ['link', { rel: 'icon', href: `${siteBase}favicon.ico` }],
+    ['meta', { name: 'theme-color', content: '#f25d27' }],
+  ],
   sitemap: {
     hostname: siteUrl,
   },

@@ -177,3 +177,19 @@ python main.py assets/onizuka_fire_motion.mp4 output/model.webp --animated webp 
 - The initial model load can take some time
 - Long videos exported as `--animated gif` can become large
 - If you need transparency, prefer `--animated webp` or `--interval` output instead of regular video export
+
+## Documentation Accent Prompt
+
+The documentation theme currently uses the following prompt as its accent-color direction:
+
+```xml
+ドキュメントのアクセントで下記のカラーマップを使ってみたら？？
+背景は #F2EFEB にしてもいいかも！
+<palette>
+<color name='イラスト-1' rgb='F22233' r='242' g='33' b='51' />
+<color name='イラスト-2' rgb='F28705' r='242' g='135' b='4' />
+<color name='イラスト-3' rgb='F2EFEB' r='242' g='238' b='234' />
+<color name='イラスト-4' rgb='F25D27' r='242' g='93' b='38' />
+<color name='イラスト-5' rgb='F20505' r='242' g='4' b='4' />
+</palette>
+```

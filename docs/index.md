@@ -40,3 +40,19 @@ features:
 ## Latest Experiment
 
 The fire-effect clip comparison is documented in [Examples](/guide/examples). For `assets/onizuka_fire_motion.mp4`, `silueta` gave the best overall balance, while `u2net` was the most stable fallback when you want a cleaner silhouette.
+
+## Documentation Accent Prompt
+
+This site's accent palette is based on the following prompt:
+
+```xml
+ドキュメントのアクセントで下記のカラーマップを使ってみたら？？
+背景は #F2EFEB にしてもいいかも！
+<palette>
+<color name='イラスト-1' rgb='F22233' r='242' g='33' b='51' />
+<color name='イラスト-2' rgb='F28705' r='242' g='135' b='4' />
+<color name='イラスト-3' rgb='F2EFEB' r='242' g='238' b='234' />
+<color name='イラスト-4' rgb='F25D27' r='242' g='93' b='38' />
+<color name='イラスト-5' rgb='F20505' r='242' g='4' b='4' />
+</palette>
+```

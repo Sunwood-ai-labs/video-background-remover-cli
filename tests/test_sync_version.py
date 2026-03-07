@@ -54,6 +54,30 @@ class SyncVersionTests(unittest.TestCase):
             self.assertIn('__version__ = "0.2.0"', package_init.read_text(encoding="utf-8"))
             self.assertIn('version = "0.2.0"', lockfile.read_text(encoding="utf-8"))
 
+    def test_sync_version_skips_missing_optional_files(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pyproject = root / "pyproject.toml"
+            package_init = root / "src" / "video_background_remover_cli" / "__init__.py"
+
+            package_init.parent.mkdir(parents=True, exist_ok=True)
+            pyproject.write_text('[project]\nversion = "0.1.1"\n', encoding="utf-8")
+            package_init.write_text(
+                'try:\n    __version__ = version("video-background-remover")\n'
+                'except PackageNotFoundError:\n    __version__ = "0.1.1"\n',
+                encoding="utf-8",
+            )
+
+            updated = sync_version("v0.2.0", root=root)
+
+            self.assertEqual(
+                {path.relative_to(root).as_posix() for path in updated},
+                {
+                    "pyproject.toml",
+                    "src/video_background_remover_cli/__init__.py",
+                },
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

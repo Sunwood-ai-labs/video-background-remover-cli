@@ -55,6 +55,8 @@ def sync_version(version: str, root: Path = ROOT) -> list[Path]:
     }
 
     for path, (pattern, replacement) in replacements.items():
+        if not path.exists():
+            continue
         original = path.read_text(encoding="utf-8")
         updated = replace_first(pattern, replacement, original, path)
         if updated != original:

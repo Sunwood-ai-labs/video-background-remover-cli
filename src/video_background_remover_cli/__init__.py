@@ -5,6 +5,6 @@ from .bg_remover import VideoBackgroundRemover
 try:
     __version__ = version("video-background-remover")
 except PackageNotFoundError:
-    __version__ = "0.1.2"
+    __version__ = "0.1.3"
 
 __all__ = ["VideoBackgroundRemover", "__version__"]

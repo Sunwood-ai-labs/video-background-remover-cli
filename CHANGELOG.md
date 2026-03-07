@@ -1,25 +1,40 @@
 # Changelog
 
+This file is a high-level summary of the major releases for `video-background-remover`.
+
 ## 0.2.0 - 2026-03-07
 
-`0.1.1` から `0.1.6` はデプロイ確認やリリース同期のためのマイナーバージョンとして扱い、このリリースノートでは `0.1.0` から蓄積した実質的な変更点をまとめています。
+This release turns the project from a repository-first utility into a packaged CLI with clearer distribution and documentation.
 
-### Added
+### Highlights
 
-- PyPI 配布を前提にしたパッケージ構成を追加し、`video-background-remover` / `vbr` コマンドと `python -m video_background_remover_cli` 実行をサポート
-- `README.pypi.md`、`project.scripts`、`project.urls` などの配布メタデータを追加し、インストール後の利用導線を整理
-- VitePress ベースのドキュメントサイトを追加し、英語・日本語のガイド、使用例、モデル説明を公開
-- 火炎エフェクト付きサンプル動画のモデル比較実験を追加し、比較用 WebP・マスク画像・再実行スクリプトを同梱
-- CLI の挙動とリリース用バージョン同期を検証するテストを追加
+- Packaged the project for PyPI with `video-background-remover` and `vbr` console commands
+- Added a dedicated package entry point for `python -m video_background_remover_cli`
+- Expanded project metadata for distribution, installation, and repository links
+- Added automated tests for CLI behavior and release version synchronization
+- Introduced a VitePress documentation site with English and Japanese guides
+- Added model comparison assets and rerun scripts for the fire-effect sample experiment
+- Automated version synchronization, package publishing, and GitHub Pages deployment
 
-### Changed
+## 0.1.1 - 0.1.6
 
-- README をパッケージ利用前提の構成に更新し、`pip install video-background-remover` と `uv sync --extra dev` を案内
-- ドキュメントのテーマ、OGP、favicon、X Card メタデータを整備し、GitHub Pages 公開向けの見た目と共有体験を改善
-- リリース時にタグから `pyproject.toml`、`src/video_background_remover_cli/__init__.py`、`uv.lock` を同期する仕組みを導入
+These releases were primarily used to stabilize packaging and deployment rather than to introduce user-facing features.
 
-### Internal
+### Highlights
 
-- PyPI Trusted Publishing 用の GitHub Actions ワークフローを追加
-- GitHub Pages へのドキュメントデプロイを自動化
-- 既存の `main.py` エントリーポイントを薄くし、パッケージ側 CLI へ責務を集約
+- Validated the PyPI publishing pipeline and trusted publishing setup
+- Refined release automation so repository version files stay aligned with release tags
+- Improved GitHub Pages deployment and docs asset handling
+- Polished documentation presentation, social cards, favicon assets, and metadata
+
+## 0.1.0
+
+Initial public release of the video background removal CLI.
+
+### Highlights
+
+- Added video background removal powered by `rembg` and `OpenCV`
+- Supported full video export, transparent frame extraction, and animated WebP or GIF output
+- Added background replacement with solid colors or background images
+- Exposed multiple segmentation models including `isnet-general-use`, `u2net`, `u2netp`, `u2net_human_seg`, and `silueta`
+- Included README-based usage examples for English and Japanese users

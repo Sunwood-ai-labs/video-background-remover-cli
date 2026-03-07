@@ -49,6 +49,32 @@ Representative frames sampled at 1.0s, 3.0s, 5.0s, 7.0s, and 9.0s. This makes it
 
 The alpha-mask view is useful for checking subject coverage. `u2net_human_seg` collapses on this clip, while `silueta`, `u2net`, and `isnet-general-use` keep a far more complete silhouette.
 
+### Re-run the Experiment
+
+The tracked experiment definition is stored under `experiments/onizuka_fire_motion/`.
+
+- Script: `experiments/onizuka_fire_motion/run_experiment.py`
+- Config: `experiments/onizuka_fire_motion/experiment_config.json`
+- Notes: `experiments/onizuka_fire_motion/README.md`
+- Output directory: `output/model_experiments/onizuka_fire_motion/`
+
+Run it from the repository root:
+
+```bash
+python experiments/onizuka_fire_motion/run_experiment.py
+```
+
+To test an additional model later, add it to the `models` array in `experiments/onizuka_fire_motion/experiment_config.json` and run the same command again.
+
+The script regenerates:
+
+- `<model>_anim.webp`
+- `<model>_anim_frames/`
+- `results.csv`
+- `alpha_stats.csv`
+- `comparison_sheet.png`
+- `comparison_masks.png`
+
 ## Recipe: White Background Video
 
 Remove the background and fill it with white:

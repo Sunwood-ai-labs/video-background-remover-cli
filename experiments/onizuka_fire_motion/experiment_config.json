@@ -1,0 +1,14 @@
+{
+  "input_video": "assets/onizuka_fire_motion.mp4",
+  "output_dir": "output/model_experiments/onizuka_fire_motion",
+  "models": [
+    "isnet-general-use",
+    "u2net",
+    "u2netp",
+    "u2net_human_seg",
+    "silueta"
+  ],
+  "webp_fps": 8,
+  "sample_indices": [8, 24, 40, 56, 72],
+  "sample_labels": ["1.0s", "3.0s", "5.0s", "7.0s", "9.0s"]
+}

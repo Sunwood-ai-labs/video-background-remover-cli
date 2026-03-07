@@ -157,6 +157,32 @@ python main.py assets/onizuka_fire_motion.mp4 output/model.webp --animated webp 
 
 ![Mask comparison](example/onizuka_fire_motion_comparison_masks.png)
 
+### Re-run This Experiment
+
+The tracked experiment definition lives in `experiments/onizuka_fire_motion/`.
+
+- Script: `experiments/onizuka_fire_motion/run_experiment.py`
+- Config: `experiments/onizuka_fire_motion/experiment_config.json`
+- Notes: `experiments/onizuka_fire_motion/README.md`
+- Generated files: `output/model_experiments/onizuka_fire_motion/`
+
+Run it again from the repository root:
+
+```bash
+python experiments/onizuka_fire_motion/run_experiment.py
+```
+
+To test an additional model later, add it to the `models` array in `experiments/onizuka_fire_motion/experiment_config.json` and run the same command again.
+
+The script regenerates:
+
+- `<model>_anim.webp`
+- `<model>_anim_frames/`
+- `results.csv`
+- `alpha_stats.csv`
+- `comparison_sheet.png`
+- `comparison_masks.png`
+
 ## 🖼️ Output Examples
 
 - Input video: `assets/onizuka_idle_motion.mp4`

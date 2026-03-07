@@ -49,6 +49,32 @@ python main.py assets/onizuka_fire_motion.mp4 output/model.webp --animated webp 
 
 アルファマスクを見ると、`u2net_human_seg` がこの素材では大きく崩れている一方で、`silueta`、`u2net`、`isnet-general-use` は被写体の面積を比較的維持しています。
 
+### 実験の再実行方法
+
+追跡している実験定義は `experiments/onizuka_fire_motion/` にあります。
+
+- スクリプト: `experiments/onizuka_fire_motion/run_experiment.py`
+- 設定: `experiments/onizuka_fire_motion/experiment_config.json`
+- 手順メモ: `experiments/onizuka_fire_motion/README.md`
+- 出力先: `output/model_experiments/onizuka_fire_motion/`
+
+リポジトリのルートから実行:
+
+```bash
+python experiments/onizuka_fire_motion/run_experiment.py
+```
+
+あとでモデルを追加したい場合は `experiments/onizuka_fire_motion/experiment_config.json` の `models` に名前を追加して、同じコマンドを再実行してください。
+
+再生成されるもの:
+
+- `<model>_anim.webp`
+- `<model>_anim_frames/`
+- `results.csv`
+- `alpha_stats.csv`
+- `comparison_sheet.png`
+- `comparison_masks.png`
+
 ## レシピ: 白背景の動画
 
 背景を除去して白で埋めた動画を書き出します。

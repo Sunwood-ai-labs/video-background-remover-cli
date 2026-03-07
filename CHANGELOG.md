@@ -2,21 +2,37 @@
 
 This file is a high-level summary of the major releases for `video-background-remover`.
 
-## 0.2.0 - 2026-03-07
+## 🚀 0.2.0 - 2026-03-07
 
-This release turns the project from a repository-first utility into a packaged CLI with clearer distribution and documentation.
+This release moves the project beyond a repository-local script and turns it into a more complete CLI package with clearer installation, better documentation, stronger release automation, and basic regression coverage.
 
-### Highlights
+### Product and CLI
 
-- Packaged the project for PyPI with `video-background-remover` and `vbr` console commands
+- Packaged the project for PyPI so users can install it as a standard Python tool instead of relying only on repository-local execution
+- Added `video-background-remover` and `vbr` console commands for direct command-line use after installation
 - Added a dedicated package entry point for `python -m video_background_remover_cli`
-- Expanded project metadata for distribution, installation, and repository links
-- Added automated tests for CLI behavior and release version synchronization
-- Introduced a VitePress documentation site with English and Japanese guides
-- Added model comparison assets and rerun scripts for the fire-effect sample experiment
-- Automated version synchronization, package publishing, and GitHub Pages deployment
+- Clarified package metadata, project URLs, and install guidance for local development and distribution
 
-## 0.1.1 - 0.1.6
+### Documentation and Examples
+
+- Introduced a VitePress documentation site with English and Japanese guides
+- Expanded usage guidance for getting started, model selection, examples, and CLI behavior
+- Improved presentation assets including social cards, favicon assets, and metadata for GitHub Pages and link previews
+- Added and published a model comparison experiment for a fire-effect sample clip, including visual outputs and rerun assets
+
+### Quality and Release Engineering
+
+- Added automated tests covering CLI helper behavior, execution routing, and release version synchronization
+- Automated version synchronization so release tags can update tracked version files consistently
+- Added GitHub Actions workflows for package publishing and GitHub Pages deployment
+- Improved the release pipeline around trusted publishing and repeatable package builds
+
+### Release Scope
+
+- This release summarizes the substantive changes since `v0.1.0`
+- Versions `v0.1.1` through `v0.1.6` were mainly used to validate deployment and release workflow changes, so they are treated as release-engineering iterations rather than separate feature milestones
+
+## 🛠️ 0.1.1 - 0.1.6
 
 These releases were primarily used to stabilize packaging and deployment rather than to introduce user-facing features.
 
@@ -27,7 +43,7 @@ These releases were primarily used to stabilize packaging and deployment rather 
 - Improved GitHub Pages deployment and docs asset handling
 - Polished documentation presentation, social cards, favicon assets, and metadata
 
-## 0.1.0
+## 🌱 0.1.0
 
 Initial public release of the video background removal CLI.
 

@@ -18,7 +18,7 @@
 
 A Python CLI tool that removes backgrounds from videos using `rembg` and `OpenCV`. It supports full video export, transparent frame extraction, and animated WebP / GIF generation.
 
-## ✨ Features
+## Features
 
 - Split a video into frames, remove the background, and rebuild it as a video
 - Export transparent `webp` / `png` frames at fixed intervals
@@ -26,13 +26,13 @@ A Python CLI tool that removes backgrounds from videos using `rembg` and `OpenCV
 - Replace the removed background with a solid color or background image
 - Switch between `isnet-general-use`, `u2net`, `u2netp`, `u2net_human_seg`, and `silueta`
 
-## 📋 Requirements
+## Requirements
 
 - Python 3.10 or later
 - FFmpeg is not required
 - The model is downloaded on first run
 
-## 🛠️ Setup
+## Setup
 
 ### With `pip`
 
@@ -46,7 +46,7 @@ pip install -r requirements.txt
 uv sync
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Export a video with a white background
 
@@ -66,7 +66,7 @@ python main.py assets/onizuka_idle_motion.mp4 output/output_animated.webp --anim
 python main.py assets/onizuka_idle_motion.mp4 output/frames --interval 1 --format webp
 ```
 
-## 💡 Usage
+## Usage
 
 ```bash
 python main.py INPUT OUTPUT [options]
@@ -101,7 +101,7 @@ python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames
 
 With `--animated both`, the tool writes both `.webp` and `.gif` using the same base name.
 
-## ⚙️ Options
+## Options
 
 | Option | Description |
 | --- | --- |
@@ -117,7 +117,7 @@ With `--animated both`, the tool writes both `.webp` and `.gif` using the same b
 | `--webp-fps` | FPS for animated output |
 | `--max-frames` | Maximum number of frames for animated output |
 
-## 🧠 Models
+## Models
 
 | Model | Description |
 | --- | --- |
@@ -183,7 +183,7 @@ The script regenerates:
 - `comparison_sheet.png`
 - `comparison_masks.png`
 
-## 🖼️ Output Examples
+## Output Examples
 
 - Input video: `assets/onizuka_idle_motion.mp4`
 - Animated WebP: `example/output_animated.webp`
@@ -198,24 +198,24 @@ The script regenerates:
 | --- | --- |
 | ![GIF comparison](example/onizuka_walk_motion.gif) | ![WebP comparison](example/onizuka_walk_motion.webp) |
 
-## 📝 Notes
+## Notes
 
 - The initial model load can take some time
 - Long videos exported as `--animated gif` can become large
 - If you need transparency, prefer `--animated webp` or `--interval` output instead of regular video export
 
-## Documentation Accent Prompt
+## Documentation Color Map
 
-The documentation theme currently uses the following prompt as its accent-color direction:
+<p>
+  <img src="https://img.shields.io/badge/Base_BG-%23F2EFEB-F2EFEB?style=flat-square" alt="Base BG #F2EFEB">
+  <img src="https://img.shields.io/badge/Accent_1-%23F22233-F22233?style=flat-square" alt="Accent 1 #F22233">
+  <img src="https://img.shields.io/badge/Accent_2-%23F28705-F28705?style=flat-square" alt="Accent 2 #F28705">
+  <img src="https://img.shields.io/badge/Accent_3-%23F25D27-F25D27?style=flat-square" alt="Accent 3 #F25D27">
+  <img src="https://img.shields.io/badge/Accent_4-%23F20505-F20505?style=flat-square" alt="Accent 4 #F20505">
+</p>
 
-```xml
-ドキュメントのアクセントで下記のカラーマップを使ってみたら？？
-背景は #F2EFEB にしてもいいかも！
-<palette>
-<color name='イラスト-1' rgb='F22233' r='242' g='33' b='51' />
-<color name='イラスト-2' rgb='F28705' r='242' g='135' b='4' />
-<color name='イラスト-3' rgb='F2EFEB' r='242' g='238' b='234' />
-<color name='イラスト-4' rgb='F25D27' r='242' g='93' b='38' />
-<color name='イラスト-5' rgb='F20505' r='242' g='4' b='4' />
-</palette>
-```
+## Docs Development
+
+- The social card image is published at `docs/public/ogp.jpg`.
+- Social card metadata is configured in `docs/.vitepress/config.ts`.
+- To verify the current card after a docs change or deployment, open `https://www.opengraphs.com/tools/og-debugger` and test `https://sunwood-ai-labs.github.io/video-background-remover-cli/`.

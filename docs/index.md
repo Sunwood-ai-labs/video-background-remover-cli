@@ -17,22 +17,22 @@ hero:
       link: https://github.com/Sunwood-ai-labs/video-background-remover-cli
 
 features:
-  - icon: 🎬
+  - icon: "🎬"
     title: Full Video Export
     details: Split a video into frames, remove the background, and rebuild it as a video.
-  - icon: 🖼️
+  - icon: "🧩"
     title: Transparent Frame Export
     details: Export transparent WebP / PNG frames at fixed intervals.
-  - icon: 🌀
+  - icon: "✨"
     title: Animated WebP / GIF
     details: Generate transparent animated WebP or GIF files directly from your video.
-  - icon: 🎨
+  - icon: "🖼️"
     title: Background Replacement
     details: Replace the removed background with a solid color or a custom background image.
-  - icon: 🧠
+  - icon: "🤖"
     title: Multiple AI Models
     details: Switch between isnet-general-use, u2net, u2netp, u2net_human_seg, and silueta.
-  - icon: ⚙️
+  - icon: "⚙️"
     title: No FFmpeg Required
     details: All processing is done with Python and the bundled libraries.
 ---
@@ -41,18 +41,18 @@ features:
 
 The fire-effect clip comparison is documented in [Examples](/guide/examples). For `assets/onizuka_fire_motion.mp4`, `silueta` gave the best overall balance, while `u2net` was the most stable fallback when you want a cleaner silhouette.
 
-## Documentation Accent Prompt
+## Documentation Color Map
 
-This site's accent palette is based on the following prompt:
+<div class="vp-badges">
+  <img src="https://img.shields.io/badge/Base_BG-%23F2EFEB-F2EFEB?style=flat-square" alt="Base BG #F2EFEB">
+  <img src="https://img.shields.io/badge/Accent_1-%23F22233-F22233?style=flat-square" alt="Accent 1 #F22233">
+  <img src="https://img.shields.io/badge/Accent_2-%23F28705-F28705?style=flat-square" alt="Accent 2 #F28705">
+  <img src="https://img.shields.io/badge/Accent_3-%23F25D27-F25D27?style=flat-square" alt="Accent 3 #F25D27">
+  <img src="https://img.shields.io/badge/Accent_4-%23F20505-F20505?style=flat-square" alt="Accent 4 #F20505">
+</div>
 
-```xml
-ドキュメントのアクセントで下記のカラーマップを使ってみたら？？
-背景は #F2EFEB にしてもいいかも！
-<palette>
-<color name='イラスト-1' rgb='F22233' r='242' g='33' b='51' />
-<color name='イラスト-2' rgb='F28705' r='242' g='135' b='4' />
-<color name='イラスト-3' rgb='F2EFEB' r='242' g='238' b='234' />
-<color name='イラスト-4' rgb='F25D27' r='242' g='93' b='38' />
-<color name='イラスト-5' rgb='F20505' r='242' g='4' b='4' />
-</palette>
-```
+## Social Card Check
+
+You can preview the current social card with [OpenGraphs Debugger](https://www.opengraphs.com/tools/og-debugger).
+
+- Test URL: `https://sunwood-ai-labs.github.io/video-background-remover-cli/`

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -16,11 +16,40 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Derive release version
+        if: github.ref_type == 'tag'
+        run: echo "RELEASE_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Sync version files from tag
+        if: github.ref_type == 'tag'
+        run: python scripts/sync_version.py "${RELEASE_VERSION}"
+
+      - name: Commit synced version files
+        if: github.ref_type == 'tag'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+        run: |
+          if git diff --quiet; then
+            echo "Version files already matched tag ${RELEASE_VERSION}"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml src/video_background_remover_cli/__init__.py uv.lock
+          git commit -m "🔖 Sync release version ${RELEASE_VERSION}" \
+            -m "- align package metadata with tag v${RELEASE_VERSION}" \
+            -m "- update the repository version files before publishing" \
+            -m "- push the synchronized release state back to ${DEFAULT_BRANCH}"
+          git push origin "HEAD:${DEFAULT_BRANCH}"
 
       - name: Install build tools
         run: python -m pip install --upgrade build twine

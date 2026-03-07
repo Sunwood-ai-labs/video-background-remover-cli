@@ -5,7 +5,7 @@ const siteDescription = 'Remove backgrounds from videos using rembg and OpenCV'
 const siteOrigin = 'https://sunwood-ai-labs.github.io'
 const siteBase = '/video-background-remover-cli/'
 const siteUrl = new URL(siteBase, siteOrigin).toString()
-const ogImageUrl = new URL('ogp.jpg', siteUrl).toString()
+const ogImageUrl = new URL('ogp-v2.jpg', siteUrl).toString()
 
 const socialLinks = [
   {
@@ -63,8 +63,8 @@ export default defineConfig({
       ['meta', { property: 'og:url', content: pageUrl }],
       ['meta', { property: 'og:image', content: ogImageUrl }],
       ['meta', { property: 'og:image:type', content: 'image/jpeg' }],
-      ['meta', { property: 'og:image:width', content: '1376' }],
-      ['meta', { property: 'og:image:height', content: '768' }],
+      ['meta', { property: 'og:image:width', content: '1200' }],
+      ['meta', { property: 'og:image:height', content: '600' }],
       [
         'meta',
         {

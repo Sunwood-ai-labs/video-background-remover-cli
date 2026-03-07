@@ -1,6 +1,6 @@
 <div align="center">
   <h1>Video Background Remover CLI</h1>
-  <img src="example/output_animated.webp" alt="Header image" width="320">
+  <img src="https://raw.githubusercontent.com/Sunwood-ai-labs/video-background-remover-cli/main/example/output_animated.gif" alt="Header image" width="320">
   <p>
     <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
     <img src="https://img.shields.io/badge/OpenCV-4.x-5C3EE8?logo=opencv&logoColor=white" alt="OpenCV 4.x">
@@ -18,7 +18,7 @@
 
 A Python CLI tool that removes backgrounds from videos using `rembg` and `OpenCV`. It supports full video export, transparent frame extraction, and animated WebP / GIF generation.
 
-## Features
+## ✨ Features
 
 - Split a video into frames, remove the background, and rebuild it as a video
 - Export transparent `webp` / `png` frames at fixed intervals
@@ -26,13 +26,13 @@ A Python CLI tool that removes backgrounds from videos using `rembg` and `OpenCV
 - Replace the removed background with a solid color or background image
 - Switch between `isnet-general-use`, `u2net`, `u2netp`, `u2net_human_seg`, and `silueta`
 
-## Requirements
+## 📋 Requirements
 
 - Python 3.10 or later
 - FFmpeg is not required
 - The model is downloaded on first run
 
-## Install
+## 🛠️ Install
 
 ### From PyPI
 
@@ -52,7 +52,7 @@ pip install -e ".[dev]"
 uv sync --extra dev
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
 ### 1. Export a video with a white background
 
@@ -72,7 +72,7 @@ video-background-remover assets/onizuka_idle_motion.mp4 output/output_animated.w
 video-background-remover assets/onizuka_idle_motion.mp4 output/frames --interval 1 --format webp
 ```
 
-## Usage
+## 💡 Usage
 
 ```bash
 video-background-remover INPUT OUTPUT [options]
@@ -109,7 +109,7 @@ video-background-remover input.mp4 output/output --animated both --webp-fps 8 --
 
 With `--animated both`, the tool writes both `.webp` and `.gif` using the same base name.
 
-## Options
+## ⚙️ Options
 
 | Option | Description |
 | --- | --- |
@@ -125,7 +125,7 @@ With `--animated both`, the tool writes both `.webp` and `.gif` using the same b
 | `--webp-fps` | FPS for animated output |
 | `--max-frames` | Maximum number of frames for animated output |
 
-## Models
+## 🧠 Models
 
 | Model | Description |
 | --- | --- |
@@ -135,7 +135,7 @@ With `--animated both`, the tool writes both `.webp` and `.gif` using the same b
 | `u2net_human_seg` | Optimized for human segmentation |
 | `silueta` | Higher quality but slower |
 
-## Fire Effect Comparison
+## 🔥 Fire Effect Comparison
 
 Test clip: `assets/onizuka_fire_motion.mp4`
 
@@ -191,7 +191,7 @@ The script regenerates:
 - `comparison_sheet.png`
 - `comparison_masks.png`
 
-## Output Examples
+## 🖼️ Output Examples
 
 - Input video: `assets/onizuka_idle_motion.mp4`
 - Animated WebP: `example/output_animated.webp`
@@ -206,13 +206,13 @@ The script regenerates:
 | --- | --- |
 | ![GIF comparison](example/onizuka_walk_motion.gif) | ![WebP comparison](example/onizuka_walk_motion.webp) |
 
-## Notes
+## 📝 Notes
 
 - The initial model load can take some time
 - Long videos exported as `--animated gif` can become large
 - If you need transparency, prefer `--animated webp` or `--interval` output instead of regular video export
 
-## Documentation Color Map
+## 🎨 Documentation Color Map
 
 <p>
   <img src="https://img.shields.io/badge/Base_BG-%23F2EFEB-F2EFEB?style=flat-square" alt="Base BG #F2EFEB">
@@ -222,7 +222,7 @@ The script regenerates:
   <img src="https://img.shields.io/badge/Accent_4-%23F20505-F20505?style=flat-square" alt="Accent 4 #F20505">
 </p>
 
-## Docs Development
+## 🧪 Docs Development
 
 - The social card image is published at `docs/public/ogp.jpg`.
 - Social card metadata is configured in `docs/.vitepress/config.ts`.

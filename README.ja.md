@@ -1,6 +1,6 @@
 <div align="center">
   <h1>Video Background Remover CLI</h1>
-  <img src="example/output_animated.webp" alt="Header image" width="320">
+  <img src="https://raw.githubusercontent.com/Sunwood-ai-labs/video-background-remover-cli/main/example/output_animated.gif" alt="Header image" width="320">
   <p>
     <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
     <img src="https://img.shields.io/badge/OpenCV-4.x-5C3EE8?logo=opencv&logoColor=white" alt="OpenCV 4.x">
@@ -131,7 +131,7 @@ video-background-remover input.mp4 output/output --animated both --webp-fps 8 --
 | `u2net_human_seg` | 人物セグメンテーション向け |
 | `silueta` | 高品質寄りだが遅め |
 
-## 炎エフェクト比較
+## 🔥 炎エフェクト比較
 
 検証素材: `assets/onizuka_fire_motion.mp4`
 

@@ -1,15 +1,17 @@
 # Video Background Remover CLI
 
+<img src="https://raw.githubusercontent.com/Sunwood-ai-labs/video-background-remover-cli/main/example/output_animated.gif" alt="Header image" width="320">
+
 `video-background-remover` is a Python CLI package for removing video backgrounds with `rembg` and `OpenCV`.
 
-## Features
+## ✨ Features
 
 - Export a processed video with a replacement background
 - Export transparent `webp` / `png` frames at fixed intervals
 - Generate transparent animated `webp` / `gif`
 - Choose from `isnet-general-use`, `u2net`, `u2netp`, `u2net_human_seg`, and `silueta`
 
-## Install
+## 🛠️ Install
 
 ```bash
 pip install video-background-remover
@@ -21,7 +23,7 @@ For isolated CLI installs:
 pipx install video-background-remover
 ```
 
-## Usage
+## 💡 Usage
 
 ```bash
 video-background-remover INPUT OUTPUT [options]
@@ -36,7 +38,7 @@ video-background-remover input.mp4 output/anim.webp --animated webp --webp-fps 1
 python -m video_background_remover_cli input.mp4 output.gif --animated gif
 ```
 
-## Development
+## 🧪 Development
 
 Build distributions:
 

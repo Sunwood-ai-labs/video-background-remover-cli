@@ -12,6 +12,7 @@ Process flow:
 
 import os
 import shutil
+import subprocess
 import cv2
 import numpy as np
 from PIL import Image
@@ -31,7 +32,14 @@ class VideoBackgroundRemover:
         - u2net: For salient object detection
         - silueta: High quality, slower
         """
-        self.session = new_session(model_name)
+        self.model_name = model_name
+        self.session = None
+
+    def _get_session(self):
+        """Create the rembg session on first use."""
+        if self.session is None:
+            self.session = new_session(self.model_name)
+        return self.session
 
     def extract_frames(self, video_path: str, output_dir: str) -> list:
         """Extract all frames from video to directory.
@@ -69,6 +77,325 @@ class VideoBackgroundRemover:
 
         return frame_paths
 
+    def _resize_frame(
+        self,
+        frame: np.ndarray,
+        output_size: tuple[int, int] | None = None,
+    ) -> np.ndarray:
+        """Resize a frame to the requested output size."""
+        if output_size is None:
+            return frame
+
+        width, height = output_size
+        return cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
+
+    def _extract_mask_channel(self, mask_frame: np.ndarray) -> np.ndarray:
+        """Extract a single alpha channel from a MatAnyone mask frame."""
+        if mask_frame.ndim == 2:
+            return mask_frame
+
+        if mask_frame.shape[2] == 4:
+            return mask_frame[:, :, 3]
+
+        return cv2.cvtColor(mask_frame, cv2.COLOR_BGR2GRAY)
+
+    def _estimate_background_color(
+        self,
+        fg_frame: np.ndarray,
+        alpha_channel: np.ndarray,
+    ) -> np.ndarray:
+        """Estimate the baked-in background color from transparent mask regions."""
+        transparent_pixels = fg_frame[alpha_channel == 0]
+        if transparent_pixels.size == 0:
+            transparent_pixels = fg_frame[alpha_channel <= 8]
+        if transparent_pixels.size == 0:
+            return np.array([0.0, 0.0, 0.0], dtype=np.float32)
+
+        return np.median(transparent_pixels, axis=0).astype(np.float32)
+
+    def _decontaminate_foreground(
+        self,
+        fg_frame: np.ndarray,
+        alpha_channel: np.ndarray,
+    ) -> np.ndarray:
+        """Remove baked background color from semi-transparent edge pixels."""
+        matte_bgr = self._estimate_background_color(fg_frame, alpha_channel)
+        alpha = alpha_channel.astype(np.float32) / 255.0
+        alpha_3 = alpha[:, :, None]
+
+        fg_float = fg_frame.astype(np.float32)
+        restored = fg_float.copy()
+        active_mask = alpha > 0
+        if np.any(active_mask):
+            safe_alpha = np.clip(alpha_3, 1e-3, 1.0)
+            restored = (fg_float - (1.0 - alpha_3) * matte_bgr[None, None, :]) / safe_alpha
+            restored = np.clip(restored, 0.0, 255.0)
+
+        restored[alpha <= 0.0] = 0.0
+        return restored.astype(np.uint8)
+
+    def _combine_matanyone_frames(
+        self,
+        fg_frame: np.ndarray,
+        alpha_frame: np.ndarray,
+        output_size: tuple[int, int] | None = None,
+    ) -> np.ndarray:
+        """Combine MatAnyone foreground and alpha frames into one RGBA frame."""
+        fg_frame = self._resize_frame(fg_frame, output_size=output_size)
+        alpha_frame = self._resize_frame(alpha_frame, output_size=output_size)
+
+        if fg_frame.shape[:2] != alpha_frame.shape[:2]:
+            alpha_frame = cv2.resize(
+                alpha_frame,
+                (fg_frame.shape[1], fg_frame.shape[0]),
+                interpolation=cv2.INTER_AREA,
+            )
+
+        alpha_channel = self._extract_mask_channel(alpha_frame)
+        cleaned_fg = self._decontaminate_foreground(fg_frame, alpha_channel)
+        rgba_frame = cv2.cvtColor(cleaned_fg, cv2.COLOR_BGR2RGBA)
+        rgba_frame[:, :, 3] = alpha_channel
+        rgba_frame[alpha_channel == 0, :3] = 0
+        return rgba_frame
+
+    def _open_video_capture(self, video_path: str) -> cv2.VideoCapture:
+        """Open a video capture or raise a clear error."""
+        capture = cv2.VideoCapture(video_path)
+        if not capture.isOpened():
+            raise ValueError(f"Cannot open video: {video_path}")
+        return capture
+
+    def _get_video_background(self, bg_image_path: str | None, size: tuple[int, int]):
+        """Load and resize a background image when requested."""
+        if not bg_image_path:
+            return None
+
+        bg_image = cv2.imread(bg_image_path, cv2.IMREAD_COLOR)
+        if bg_image is None:
+            raise ValueError(f"Cannot open background image: {bg_image_path}")
+
+        return cv2.resize(bg_image, size, interpolation=cv2.INTER_AREA)
+
+    def _iter_matanyone_frames(
+        self,
+        fg_video_path: str,
+        alpha_video_path: str,
+        *,
+        target_fps: int | None = None,
+        max_frames: int | None = None,
+        output_size: tuple[int, int] | None = None,
+    ):
+        """Yield RGBA frames assembled from MatAnyone foreground and alpha videos."""
+        fg_cap = self._open_video_capture(fg_video_path)
+        alpha_cap = self._open_video_capture(alpha_video_path)
+
+        fg_fps = fg_cap.get(cv2.CAP_PROP_FPS) or 0.0
+        alpha_fps = alpha_cap.get(cv2.CAP_PROP_FPS) or 0.0
+        source_fps = fg_fps or alpha_fps
+        if source_fps <= 0:
+            raise ValueError("Could not determine FPS from the MatAnyone input videos.")
+
+        fg_total_frames = int(fg_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        alpha_total_frames = int(alpha_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        total_frames = min(fg_total_frames, alpha_total_frames)
+        if total_frames <= 0:
+            raise ValueError("No frames found in the MatAnyone input videos.")
+
+        if fg_total_frames != alpha_total_frames:
+            print(
+                "Warning: MatAnyone foreground and alpha videos have different frame counts. "
+                f"Using the shorter length ({total_frames} frames)."
+            )
+
+        if fg_fps and alpha_fps and abs(fg_fps - alpha_fps) > 0.01:
+            print(
+                "Warning: MatAnyone foreground and alpha videos have different FPS values. "
+                f"Using foreground FPS {fg_fps:.2f}."
+            )
+
+        frame_skip = 1
+        if target_fps is not None:
+            frame_skip = max(1, int(round(source_fps / target_fps)))
+        output_fps = source_fps / frame_skip
+        duration = total_frames / source_fps
+
+        print(
+            f"MatAnyone pair: {total_frames} frames, {source_fps:.2f} fps, {duration:.2f}s"
+        )
+        if target_fps is not None:
+            print(f"Output: {target_fps} fps (skip every {frame_skip} frames)")
+
+        def iterator():
+            frame_index = 0
+            saved_count = 0
+            try:
+                with tqdm(total=total_frames, desc="Processing") as pbar:
+                    while frame_index < total_frames:
+                        fg_ok, fg_frame = fg_cap.read()
+                        alpha_ok, alpha_frame = alpha_cap.read()
+                        if not fg_ok or not alpha_ok:
+                            break
+
+                        if frame_index % frame_skip == 0:
+                            rgba_frame = self._combine_matanyone_frames(
+                                fg_frame,
+                                alpha_frame,
+                                output_size=output_size,
+                            )
+                            yield saved_count, rgba_frame
+                            saved_count += 1
+
+                            if max_frames and saved_count >= max_frames:
+                                break
+
+                        frame_index += 1
+                        pbar.update(1)
+            finally:
+                fg_cap.release()
+                alpha_cap.release()
+
+        return iterator(), output_fps, total_frames
+
+    def _save_matanyone_rgba_frames(
+        self,
+        fg_video_path: str,
+        alpha_video_path: str,
+        frames_dir: str,
+        *,
+        target_fps: int | None = None,
+        max_frames: int | None = None,
+        output_size: tuple[int, int] | None = None,
+    ) -> tuple[list[str], float]:
+        """Save MatAnyone RGBA frames as PNGs and return their paths plus output FPS."""
+        os.makedirs(frames_dir, exist_ok=True)
+        frame_paths = []
+        iterator, output_fps, _ = self._iter_matanyone_frames(
+            fg_video_path,
+            alpha_video_path,
+            target_fps=target_fps,
+            max_frames=max_frames,
+            output_size=output_size,
+        )
+
+        for frame_index, rgba_frame in iterator:
+            frame_path = os.path.join(frames_dir, f"frame_{frame_index:06d}.png")
+            Image.fromarray(rgba_frame).save(frame_path, format="PNG")
+            frame_paths.append(frame_path)
+
+        if not frame_paths:
+            raise ValueError("No frames extracted from the MatAnyone input videos.")
+
+        return frame_paths, output_fps
+
+    def _load_rgba_frames_as_pil(self, frame_paths: list[str]) -> list[Image.Image]:
+        """Load RGBA PNG frames into memory as PIL images."""
+        frames: list[Image.Image] = []
+        for frame_path in tqdm(frame_paths, desc="Loading frames"):
+            with Image.open(frame_path) as frame:
+                frames.append(frame.convert("RGBA").copy())
+        return frames
+
+    def _get_ffmpeg_executable(self) -> str:
+        """Resolve the ffmpeg binary used for transparent WebM export."""
+        try:
+            from imageio_ffmpeg import get_ffmpeg_exe
+        except ImportError as exc:
+            raise RuntimeError(
+                "Transparent WebM export requires imageio-ffmpeg. "
+                "Reinstall the project dependencies and try again."
+            ) from exc
+
+        return get_ffmpeg_exe()
+
+    def _encode_png_sequence_to_webm(
+        self,
+        frames_dir: str,
+        output_path: str,
+        fps: float,
+    ) -> None:
+        """Encode RGBA PNG frames into a transparent WebM video."""
+        ffmpeg_path = self._get_ffmpeg_executable()
+        command = [
+            ffmpeg_path,
+            "-y",
+            "-framerate",
+            f"{fps:.6f}",
+            "-i",
+            os.path.join(frames_dir, "frame_%06d.png"),
+            "-c:v",
+            "libvpx-vp9",
+            "-pix_fmt",
+            "yuva420p",
+            "-b:v",
+            "0",
+            "-crf",
+            "18",
+            output_path,
+        ]
+        try:
+            subprocess.run(command, check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or "").strip()
+            raise RuntimeError(
+                "ffmpeg failed while creating the transparent WebM output. "
+                f"Details: {stderr}"
+            ) from exc
+
+    def _write_matanyone_mp4(
+        self,
+        fg_video_path: str,
+        alpha_video_path: str,
+        output_path: str,
+        fps: int | None = None,
+        bg_color: tuple | None = None,
+        bg_image_path: str | None = None,
+        output_size: tuple[int, int] | None = None,
+    ) -> None:
+        """Write a regular MP4 by compositing MatAnyone alpha onto a visible background."""
+        iterator, output_fps, _ = self._iter_matanyone_frames(
+            fg_video_path,
+            alpha_video_path,
+            target_fps=fps,
+            output_size=output_size,
+        )
+
+        writer = None
+        background_image = None
+
+        for _, rgba_frame in iterator:
+            if writer is None:
+                height, width = rgba_frame.shape[:2]
+                background_image = self._get_video_background(
+                    bg_image_path,
+                    (width, height),
+                )
+                writer_fps = fps or output_fps
+                writer = cv2.VideoWriter(
+                    output_path,
+                    cv2.VideoWriter_fourcc(*"mp4v"),
+                    writer_fps,
+                    (width, height),
+                )
+                if not writer.isOpened():
+                    raise ValueError(f"Cannot create MP4 output: {output_path}")
+                if bg_color is None and bg_image_path is None:
+                    print(
+                        "MP4 does not preserve alpha transparency. "
+                        "Compositing transparent pixels onto a black background."
+                    )
+
+            if background_image is not None:
+                bgr_frame = self._apply_background_image(rgba_frame, background_image)
+            else:
+                bgr_frame = self._apply_background_color(rgba_frame, bg_color or (0, 0, 0))
+            writer.write(bgr_frame)
+
+        if writer is None:
+            raise ValueError("No frames extracted from the MatAnyone input videos.")
+
+        writer.release()
+        print(f"Video saved to {output_path}")
+
     def remove_background_from_frame(
         self, frame_input, output_path: str = None
     ) -> np.ndarray:
@@ -90,7 +417,7 @@ class VideoBackgroundRemover:
             pil_image = Image.fromarray(rgb_frame)
 
         # Remove background using RMBG-1.4
-        output = remove(pil_image, session=self.session)
+        output = remove(pil_image, session=self._get_session())
 
         # Save if output path provided
         if output_path:
@@ -203,6 +530,7 @@ class VideoBackgroundRemover:
         output_path: str,
         fps: int = 10,
         max_frames: int = None,
+        output_size: tuple[int, int] | None = None,
     ):
         """Convert video to animated WebP (like GIF but better quality).
 
@@ -239,6 +567,7 @@ class VideoBackgroundRemover:
                     break
 
                 if frame_count % frame_skip == 0:
+                    frame = self._resize_frame(frame, output_size=output_size)
                     # Remove background
                     result = self.remove_background_from_frame(frame)
                     result_pil = Image.fromarray(result)
@@ -464,6 +793,7 @@ class VideoBackgroundRemover:
         output_path: str,
         fps: int = 10,
         max_frames: int = None,
+        output_size: tuple[int, int] | None = None,
     ):
         """Convert video to animated GIF with a GIF-specific low-memory pipeline."""
         cap = cv2.VideoCapture(video_path)
@@ -495,6 +825,7 @@ class VideoBackgroundRemover:
                     break
 
                 if frame_count % frame_skip == 0:
+                    frame = self._resize_frame(frame, output_size=output_size)
                     result = self.remove_background_from_frame(frame)
                     frame_path = os.path.join(frames_output_dir, f"frame_{saved_count:04d}.png")
                     Image.fromarray(result).save(frame_path, format="PNG")
@@ -570,6 +901,7 @@ class VideoBackgroundRemover:
         fps: int = 10,
         max_frames: int = None,
         format: str = "webp",
+        output_size: tuple[int, int] | None = None,
     ):
         """Convert video to animated WebP or GIF.
 
@@ -586,6 +918,7 @@ class VideoBackgroundRemover:
                 output_path=output_path,
                 fps=fps,
                 max_frames=max_frames,
+                output_size=output_size,
             )
             return
 
@@ -616,6 +949,7 @@ class VideoBackgroundRemover:
                     break
 
                 if frame_count % frame_skip == 0:
+                    frame = self._resize_frame(frame, output_size=output_size)
                     # Remove background
                     result = self.remove_background_from_frame(frame)
                     result_pil = Image.fromarray(result)
@@ -657,6 +991,174 @@ class VideoBackgroundRemover:
             )
             print(f"Animated {format_upper} saved to {output_path}")
 
+    def to_animated_from_mask_pair(
+        self,
+        fg_video_path: str,
+        alpha_video_path: str,
+        output_path: str,
+        fps: int = 10,
+        max_frames: int = None,
+        format: str = "webp",
+        output_size: tuple[int, int] | None = None,
+    ) -> None:
+        """Convert a MatAnyone foreground+alpha pair into animated WebP or GIF."""
+        frames_output_dir = self._prepare_animation_frames_dir(output_path)
+        print(f"Saving processed frames to {frames_output_dir}")
+        frame_paths, output_fps = self._save_matanyone_rgba_frames(
+            fg_video_path,
+            alpha_video_path,
+            frames_output_dir,
+            target_fps=fps,
+            max_frames=max_frames,
+            output_size=output_size,
+        )
+        frames = self._load_rgba_frames_as_pil(frame_paths)
+        duration_ms = int(1000 / output_fps)
+        format_upper = format.upper()
+        print(f"Saving {len(frames)} frames as animated {format_upper}...")
+
+        if format == "gif":
+            self._save_animated_gif(
+                frames,
+                output_path,
+                duration_ms=duration_ms,
+            )
+            return
+
+        frames[0].save(
+            output_path,
+            format="WEBP",
+            save_all=True,
+            append_images=frames[1:],
+            duration=duration_ms,
+            loop=0,
+            lossless=False,
+            quality=85,
+        )
+        print(f"Animated {format_upper} saved to {output_path}")
+
+    def extract_matanyone_frames_interval(
+        self,
+        fg_video_path: str,
+        alpha_video_path: str,
+        output_dir: str,
+        interval_sec: float = 1.0,
+        format: str = "webp",
+        output_size: tuple[int, int] | None = None,
+    ) -> list[str]:
+        """Extract transparent frames from a MatAnyone pair at a fixed interval."""
+        fg_cap = self._open_video_capture(fg_video_path)
+        alpha_cap = self._open_video_capture(alpha_video_path)
+        os.makedirs(output_dir, exist_ok=True)
+
+        fps = fg_cap.get(cv2.CAP_PROP_FPS) or alpha_cap.get(cv2.CAP_PROP_FPS)
+        total_frames = min(
+            int(fg_cap.get(cv2.CAP_PROP_FRAME_COUNT)),
+            int(alpha_cap.get(cv2.CAP_PROP_FRAME_COUNT)),
+        )
+        if fps <= 0:
+            raise ValueError("Could not determine FPS from the MatAnyone input videos.")
+
+        duration = total_frames / fps
+        frame_interval = max(1, int(round(fps * interval_sec)))
+
+        print(f"MatAnyone pair: {total_frames} frames, {fps:.2f} fps, {duration:.2f}s")
+        print(f"Extracting every {interval_sec}s (every {frame_interval} frames)")
+
+        output_paths = []
+        frame_count = 0
+        saved_count = 0
+
+        try:
+            with tqdm(total=total_frames, desc="Processing") as pbar:
+                while frame_count < total_frames:
+                    fg_ok, fg_frame = fg_cap.read()
+                    alpha_ok, alpha_frame = alpha_cap.read()
+                    if not fg_ok or not alpha_ok:
+                        break
+
+                    if frame_count % frame_interval == 0:
+                        timestamp = frame_count / fps
+                        rgba_frame = self._combine_matanyone_frames(
+                            fg_frame,
+                            alpha_frame,
+                            output_size=output_size,
+                        )
+                        output_path = os.path.join(
+                            output_dir,
+                            f"frame_{saved_count:04d}_t{timestamp:.1f}s.{format}",
+                        )
+                        Image.fromarray(rgba_frame).save(output_path, format=format.upper())
+                        output_paths.append(output_path)
+                        saved_count += 1
+
+                    frame_count += 1
+                    pbar.update(1)
+        finally:
+            fg_cap.release()
+            alpha_cap.release()
+
+        print(f"\nSaved {saved_count} frames to {output_dir}")
+        return output_paths
+
+    def process_matanyone_video(
+        self,
+        fg_video_path: str,
+        alpha_video_path: str,
+        output_path: str,
+        fps: int = None,
+        bg_color: tuple = None,
+        bg_image_path: str = None,
+        keep_frames: bool = False,
+        work_dir: str = None,
+        output_size: tuple[int, int] | None = None,
+    ) -> None:
+        """Convert a MatAnyone foreground+alpha pair into transparent WebM or flattened MP4."""
+        output_suffix = Path(output_path).suffix.lower()
+
+        if output_suffix == ".webm":
+            if work_dir is None:
+                work_dir = os.path.join(os.path.dirname(output_path), "matanyone_frames")
+
+            try:
+                print("\n[Step 1/2] Rendering RGBA frames from MatAnyone pair...")
+                frame_paths, output_fps = self._save_matanyone_rgba_frames(
+                    fg_video_path,
+                    alpha_video_path,
+                    work_dir,
+                    target_fps=fps,
+                    output_size=output_size,
+                )
+
+                print("\n[Step 2/2] Encoding transparent WebM...")
+                self._encode_png_sequence_to_webm(
+                    work_dir,
+                    output_path,
+                    fps=fps or output_fps,
+                )
+                print(f"\nDone! Output saved to: {output_path}")
+            finally:
+                if not keep_frames and work_dir and os.path.exists(work_dir):
+                    print("Cleaning up temporary frames...")
+                    shutil.rmtree(work_dir)
+            return
+
+        if output_suffix != ".mp4":
+            raise ValueError(
+                "MatAnyone regular video export currently supports only .webm or .mp4 output."
+            )
+
+        self._write_matanyone_mp4(
+            fg_video_path=fg_video_path,
+            alpha_video_path=alpha_video_path,
+            output_path=output_path,
+            fps=fps,
+            bg_color=bg_color,
+            bg_image_path=bg_image_path,
+            output_size=output_size,
+        )
+        print(f"\nDone! Output saved to: {output_path}")
+
     def process_video(
         self,
         input_path: str,
@@ -666,6 +1168,7 @@ class VideoBackgroundRemover:
         bg_image_path: str = None,
         keep_frames: bool = False,
         work_dir: str = None,
+        output_size: tuple[int, int] | None = None,
     ):
         """Full pipeline: video -> frames -> remove bg -> video.
 
@@ -698,7 +1201,16 @@ class VideoBackgroundRemover:
 
             # Step 1: Extract frames
             print("\n[Step 1/3] Extracting frames from video...")
-            self.extract_frames(input_path, input_frames_dir)
+            frame_paths = self.extract_frames(input_path, input_frames_dir)
+            if output_size is not None:
+                print(
+                    "Resizing extracted frames "
+                    f"to {output_size[0]}x{output_size[1]}..."
+                )
+                for frame_path in tqdm(frame_paths, desc="Resizing frames"):
+                    frame = cv2.imread(frame_path, cv2.IMREAD_UNCHANGED)
+                    resized = self._resize_frame(frame, output_size=output_size)
+                    cv2.imwrite(frame_path, resized)
 
             # Step 2: Process frames
             print("\n[Step 2/3] Removing background from frames...")
@@ -727,6 +1239,7 @@ class VideoBackgroundRemover:
         output_dir: str,
         interval_sec: float = 1.0,
         format: str = "webp",
+        output_size: tuple[int, int] | None = None,
     ) -> list:
         """Extract frames at specified interval and remove background.
 
@@ -768,6 +1281,7 @@ class VideoBackgroundRemover:
                 # Process only at intervals
                 if frame_count % frame_interval == 0:
                     timestamp = frame_count / fps
+                    frame = self._resize_frame(frame, output_size=output_size)
 
                     # Remove background
                     result = self.remove_background_from_frame(frame)

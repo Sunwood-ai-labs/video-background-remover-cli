@@ -16,13 +16,14 @@
   </p>
 </div>
 
-A Python CLI tool that removes backgrounds from videos using `rembg` and `OpenCV`. It supports full video export, transparent frame extraction, and animated WebP / GIF generation.
+A Python CLI tool that removes backgrounds from videos using `rembg` and `OpenCV`. It supports full video export, transparent frame extraction, animated WebP / GIF generation, and MatAnyone foreground+alpha pair conversion.
 
 ## ✨ Features
 
 - Split a video into frames, remove the background, and rebuild it as a video
 - Export transparent `webp` / `png` frames at fixed intervals
 - Generate transparent animated `webp` / `gif`
+- Convert MatAnyone `*_fg.mp4` + `*_alpha.mp4` pairs into transparent `webp` / `gif`
 - Replace the removed background with a solid color or background image
 - Switch between `isnet-general-use`, `u2net`, `u2netp`, `u2net_human_seg`, and `silueta`
 
@@ -72,17 +73,28 @@ video-background-remover assets/onizuka_idle_motion.mp4 output/output_animated.w
 video-background-remover assets/onizuka_idle_motion.mp4 output/frames --interval 1 --format webp
 ```
 
+### 4. Convert a MatAnyone pair into a transparent WebP
+
+```bash
+video-background-remover assets/MatAnyone --matanyone output/matanyone.webp
+```
+
 ## 💡 Usage
 
 ```bash
-video-background-remover INPUT OUTPUT [options]
+video-background-remover INPUT [OUTPUT] [options]
 ```
 
 If you are running directly from the repository, `python main.py ...` and `python -m video_background_remover_cli ...` still work.
 
+If `OUTPUT` is omitted, the CLI auto-creates `./output/<input-file-name>_<timestamp>/` and saves the result there using a name derived from the input file.
+
 ### Full video export
 
 ```bash
+video-background-remover input.mp4 --bg-color white
+video-background-remover input.mov --format mp4 --bg-color white
+video-background-remover input.mp4 --size 300x300 --bg-color white
 video-background-remover input.mp4 output.mp4 --bg-color white
 video-background-remover input.mp4 output.mp4 --bg-image background.jpg
 video-background-remover input.mp4 output.mp4 --fps 30
@@ -93,6 +105,8 @@ Regular video output does not preserve alpha transparency. If you want a visible
 ### Transparent frame export
 
 ```bash
+video-background-remover input.mp4 --interval 0.5 --format webp
+video-background-remover input.mp4 --interval 1 --format webp --size 300x300
 video-background-remover input.mp4 output/frames --interval 0.5 --format webp
 video-background-remover input.mp4 output/frames --interval 1 --format png
 ```
@@ -102,6 +116,8 @@ When `--interval` is set, `OUTPUT` is treated as a directory name instead of a f
 ### Animated WebP / GIF export
 
 ```bash
+video-background-remover input.mp4 --animated webp
+video-background-remover input.mp4 --animated webp --size 300x300
 video-background-remover input.mp4 output/output_animated.webp --animated webp
 video-background-remover input.mp4 output/output.gif --animated gif --webp-fps 8
 video-background-remover input.mp4 output/output --animated both --webp-fps 8 --max-frames 120
@@ -109,18 +125,43 @@ video-background-remover input.mp4 output/output --animated both --webp-fps 8 --
 
 With `--animated both`, the tool writes both `.webp` and `.gif` using the same base name.
 
+### MatAnyone foreground + alpha pair export
+
+Use `--matanyone` when `INPUT` is either:
+
+- a directory containing one `*_fg.*` file and its matching `*_alpha.*` file
+- a foreground file such as `clip_fg.mp4`
+
+Examples:
+
+```bash
+video-background-remover assets/MatAnyone --matanyone output/matanyone.webp
+video-background-remover assets/MatAnyone/grok-video-e3987723-09fa-4c1e-a054-eb82a7c13e8f.mp4_fg.mp4 --matanyone output/matanyone.gif --animated gif
+video-background-remover assets/MatAnyone --matanyone output/matanyone.mp4 --bg-color white
+video-background-remover assets/MatAnyone --matanyone output/matanyone_frames --interval 0.5 --format png
+```
+
+Notes:
+
+- Transparent alpha is preserved for animated `webp`, animated `gif`, and interval frame export.
+- In `--matanyone` mode, `.webp` output uses the provided alpha mask to build transparent frames.
+- Regular `mp4` does not preserve alpha. The tool composites transparent pixels onto `--bg-color`, `--bg-image`, or black when neither is specified.
+
 ## ⚙️ Options
 
 | Option | Description |
 | --- | --- |
 | `--model` | Background removal model. Default: `isnet-general-use` |
+| `--matanyone` | Treat `INPUT` as a MatAnyone directory or `*_fg.*` foreground video and use the matching `*_alpha.*` video |
+| `--alpha-video` | Explicit alpha/mask video path for `--matanyone` mode |
 | `--fps` | FPS for regular video output. Defaults to the input video's FPS |
 | `--bg-color` | Background color. Supports `white`, `black`, `green`, `blue`, `red`, `gray`, `transparent`, or `255,128,0` |
 | `--bg-image` | Path to a background image |
+| `--size` | Output size as `WIDTHxHEIGHT`, for example `300x300` |
 | `--keep-frames` | Keep intermediate frames instead of deleting them |
 | `--work-dir` | Working directory for extracted frames |
 | `--interval` | Export frames every N seconds |
-| `--format` | Output format for `--interval` mode: `webp` or `png` |
+| `--format` | Output format hint. Use `webp` / `png` for transparent frame or MatAnyone WebP output, or `mp4` for regular video export |
 | `--animated` | Animated output mode: `webp`, `gif`, or `both` |
 | `--webp-fps` | FPS for animated output |
 | `--max-frames` | Maximum number of frames for animated output |
@@ -211,6 +252,7 @@ The script regenerates:
 - The initial model load can take some time
 - Long videos exported as `--animated gif` can become large
 - If you need transparency, prefer `--animated webp` or `--interval` output instead of regular video export
+- If you already have MatAnyone foreground and alpha videos, prefer `--matanyone` because it skips `rembg` inference entirely
 
 ## 🎨 Documentation Color Map
 

@@ -105,7 +105,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _repo_src_dir() -> Path:
-    return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[1]
 
 
 def _filtered_forward_args(argv: list[str]) -> list[str]:
@@ -244,6 +244,9 @@ def _launch_in_process(args: argparse.Namespace) -> int:
     import gradio as gr
     import numpy as np
     import torch
+
+    globals()["gr"] = gr
+    globals()["np"] = np
 
     from hugging_face.tools.painter import mask_painter
     from matanyone2.demo_core import (

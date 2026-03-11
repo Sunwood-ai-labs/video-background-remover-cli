@@ -11,5 +11,5 @@ tqdm>=4.65.0
 imageio-ffmpeg>=0.6.0
 
 # ONNX Runtime (choose one)
-onnxruntime>=1.16.0          # CPU (default)
+onnxruntime>=1.16.0,<1.24.0  # CPU (default, keeps Python 3.10 compatibility)
 # onnxruntime-gpu>=1.16.0    # GPU (uncomment if you have CUDA)

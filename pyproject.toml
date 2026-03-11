@@ -14,7 +14,7 @@ dependencies = [
     "numpy>=1.24.0",
     "Pillow>=10.0.0",
     "tqdm>=4.65.0",
-    "onnxruntime>=1.16.0",
+    "onnxruntime>=1.16.0,<1.24.0",
     "imageio-ffmpeg>=0.6.0",
 ]
 keywords = ["video", "background-removal", "cli", "rembg", "opencv"]

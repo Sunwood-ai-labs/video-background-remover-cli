@@ -65,6 +65,12 @@ The repository now includes a Gradio app that mirrors the MatAnyone Video/Image 
 Recommended launch command when you already have `D:\Prj\MatAnyone` set up:
 
 ```powershell
+D:\Prj\MatAnyone\.venv\Scripts\python.exe .\webui.py --port 7860
+```
+
+You can still use `uv` from the repository root if you prefer:
+
+```powershell
 uv run --python D:\Prj\MatAnyone\.venv\Scripts\python.exe -m video_background_remover_cli.webui --port 7860
 ```
 

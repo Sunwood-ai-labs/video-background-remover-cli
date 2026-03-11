@@ -15,6 +15,7 @@ from video_background_remover_cli.cli import (
     _default_output_name,
     _default_output_root,
     _normalize_animated_output,
+    build_parser,
     parse_color,
     parse_size,
     resolve_matanyone_inputs,
@@ -47,6 +48,30 @@ class ParseSizeTests(unittest.TestCase):
     def test_invalid_size_raises(self) -> None:
         with self.assertRaises(ValueError):
             parse_size("300")
+
+
+class ParserTests(unittest.TestCase):
+    def test_parser_accepts_matanyone_backend_options(self) -> None:
+        parser = build_parser()
+
+        args = parser.parse_args(
+            [
+                "input.mp4",
+                "--backend",
+                "matanyone",
+                "--matanyone-model",
+                "MatAnyone 2",
+                "--positive-point",
+                "320,180",
+                "--negative-point",
+                "16,16",
+            ]
+        )
+
+        self.assertEqual(args.backend, "matanyone")
+        self.assertEqual(args.matanyone_model, "MatAnyone 2")
+        self.assertEqual(args.positive_point, ["320,180"])
+        self.assertEqual(args.negative_point, ["16,16"])
 
 
 class AnimatedOutputTests(unittest.TestCase):

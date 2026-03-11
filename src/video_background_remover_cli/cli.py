@@ -3,9 +3,21 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
 import sys
+import tempfile
+
+from .matanyone_bridge import (
+    MATANYONE_DEVICE_CHOICES,
+    MATANYONE_MODEL_CHOICES,
+    MATANYONE_PROFILE_CHOICES,
+    MATANYONE_SAM_MODEL_CHOICES,
+    MatAnyoneRunner,
+    resolve_matanyone_python,
+    resolve_matanyone_root,
+)
 
 
 MODEL_CHOICES = [
@@ -15,6 +27,7 @@ MODEL_CHOICES = [
     "u2net_human_seg",
     "silueta",
 ]
+BACKEND_CHOICES = ["rembg", "matanyone"]
 MATANYONE_STEM_SUFFIXES = ("_fg", "_alpha")
 DEFAULT_OUTPUT_DIR = Path("output")
 TIMESTAMP_FORMAT = "%Y%m%d_%H%M%S"
@@ -92,6 +105,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  video-background-remover input.mp4 output.mp4 --bg-color green\n"
             "  video-background-remover input.mp4 output/frames --interval 1 --format webp\n"
             "  video-background-remover input.mp4 output/anim.webp --animated webp --webp-fps 10\n"
+            "  video-background-remover input.mp4 output/anim.webp --animated both --no-bg-removal --corner-radius 32\n"
             "  video-background-remover assets/MatAnyone --matanyone output/clip.webp"
         ),
     )
@@ -110,7 +124,14 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         default="isnet-general-use",
         choices=MODEL_CHOICES,
-        help="Background removal model (default: isnet-general-use)",
+        help="rembg background removal model (default: isnet-general-use)",
+    )
+    parser.add_argument(
+        "--backend",
+        type=str,
+        default="rembg",
+        choices=BACKEND_CHOICES,
+        help="Inference backend for regular inputs: rembg or matanyone (default: rembg)",
     )
     parser.add_argument(
         "--matanyone",
@@ -125,6 +146,94 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         default=None,
         help="Explicit alpha/mask video path for --matanyone mode",
+    )
+    parser.add_argument(
+        "--matanyone-root",
+        type=str,
+        default=None,
+        help="Optional fallback path to a local MatAnyone checkout used only to discover its .venv",
+    )
+    parser.add_argument(
+        "--matanyone-python",
+        type=str,
+        default=None,
+        help="Python executable where matanyone2-runtime is installed",
+    )
+    parser.add_argument(
+        "--matanyone-model",
+        type=str,
+        default="MatAnyone 2",
+        choices=MATANYONE_MODEL_CHOICES,
+        help="MatAnyone package model used when --backend matanyone is selected",
+    )
+    parser.add_argument(
+        "--matanyone-device",
+        type=str,
+        default="auto",
+        choices=MATANYONE_DEVICE_CHOICES,
+        help="Device for MatAnyone backend: auto, cpu, or cuda (default: auto)",
+    )
+    parser.add_argument(
+        "--matanyone-performance-profile",
+        type=str,
+        default="auto",
+        choices=MATANYONE_PROFILE_CHOICES,
+        help="MatAnyone performance profile (default: auto)",
+    )
+    parser.add_argument(
+        "--matanyone-sam-model-type",
+        type=str,
+        default="auto",
+        choices=MATANYONE_SAM_MODEL_CHOICES,
+        help="SAM checkpoint type for MatAnyone backend (default: auto)",
+    )
+    parser.add_argument(
+        "--matanyone-cpu-threads",
+        type=int,
+        default=None,
+        help="Optional CPU thread count forwarded to the MatAnyone backend",
+    )
+    parser.add_argument(
+        "--matanyone-frame-limit",
+        type=int,
+        default=None,
+        help="Optional MatAnyone frame cap for loading long videos",
+    )
+    parser.add_argument(
+        "--matanyone-video-target-fps",
+        type=float,
+        default=0.0,
+        help="MatAnyone video sampling FPS. Use 0 to keep all frames (default: 0)",
+    )
+    parser.add_argument(
+        "--matanyone-output-fps",
+        type=float,
+        default=None,
+        help="Optional output FPS override passed to MatAnyone",
+    )
+    parser.add_argument(
+        "--matanyone-select-frame",
+        type=int,
+        default=0,
+        help="Frame index used for the initial MatAnyone prompt point (default: 0)",
+    )
+    parser.add_argument(
+        "--matanyone-end-frame",
+        type=int,
+        default=None,
+        help="Optional exclusive end frame forwarded to MatAnyone",
+    )
+    parser.add_argument(
+        "--positive-point",
+        action="append",
+        default=[],
+        help='Positive prompt point for MatAnyone in "x,y" format. Repeat to add more points.',
+    )
+    parser.add_argument(
+        "--negative-point",
+        action="append",
+        default=[],
+        help='Negative prompt point for MatAnyone in "x,y" format. Repeat to add more points.',
     )
     parser.add_argument(
         "--fps",
@@ -191,6 +300,23 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="Maximum frames for animated output",
+    )
+    parser.add_argument(
+        "--no-bg-removal",
+        action="store_true",
+        help=(
+            "Skip rembg inference and keep the original video content. "
+            "Useful for plain GIF/WebP conversion or transparent rounded-corner exports."
+        ),
+    )
+    parser.add_argument(
+        "--corner-radius",
+        type=int,
+        default=0,
+        help=(
+            "Rounded corner radius in output pixels. "
+            "The area outside the rounded rectangle becomes transparent for WebP/GIF/PNG outputs."
+        ),
     )
     return parser
 
@@ -355,6 +481,139 @@ def _infer_matanyone_animated_format(
     return None
 
 
+def _run_matanyone_pair_pipeline(
+    remover,
+    args: argparse.Namespace,
+    *,
+    fg_video_path: str,
+    alpha_video_path: str,
+    run_timestamp: str,
+    output_name_source: str,
+    source_mode: str,
+    bg_color: tuple[int, int, int] | None,
+    output_size: tuple[int, int] | None,
+    allow_implicit_animated: bool,
+) -> int:
+    """Route a MatAnyone foreground/alpha pair through the existing exporters."""
+    inferred_animated = args.animated
+    if inferred_animated is None and allow_implicit_animated:
+        inferred_animated = _infer_matanyone_animated_format(
+            args.output,
+            args.format,
+        )
+
+    if inferred_animated:
+        resolved_output = resolve_output_target(
+            output_name_source,
+            args.output,
+            animated=inferred_animated,
+            interval=args.interval,
+            run_timestamp=run_timestamp,
+            source_mode=source_mode,
+        )
+        if args.output is None:
+            print(
+                "Output not specified. "
+                f"Saving animated output under: {resolved_output}"
+            )
+        base_output = _normalize_animated_output(resolved_output)
+        Path(base_output).parent.mkdir(parents=True, exist_ok=True)
+        formats = ["webp", "gif"] if inferred_animated == "both" else [inferred_animated]
+        for fmt in formats:
+            remover.to_animated_from_mask_pair(
+                fg_video_path=fg_video_path,
+                alpha_video_path=alpha_video_path,
+                output_path=f"{base_output}.{fmt}",
+                fps=args.webp_fps,
+                max_frames=args.max_frames,
+                format=fmt,
+                output_size=output_size,
+                corner_radius=args.corner_radius,
+            )
+        return 0
+
+    if args.interval is not None:
+        output_dir = resolve_output_target(
+            output_name_source,
+            args.output,
+            interval=args.interval,
+            output_format=args.format,
+            run_timestamp=run_timestamp,
+            source_mode=source_mode,
+        )
+        if args.output is None:
+            print(
+                "Output not specified. "
+                f"Saving extracted frames under: {output_dir}"
+            )
+        if not output_dir.endswith(f"_{args.format}"):
+            output_dir = f"{output_dir}_{args.format}"
+        remover.extract_matanyone_frames_interval(
+            fg_video_path=fg_video_path,
+            alpha_video_path=alpha_video_path,
+            output_dir=output_dir,
+            interval_sec=args.interval,
+            format=args.format,
+            output_size=output_size,
+            corner_radius=args.corner_radius,
+        )
+        return 0
+
+    output_path = resolve_output_target(
+        output_name_source,
+        args.output,
+        output_format="mp4",
+        run_timestamp=run_timestamp,
+        source_mode=source_mode,
+    )
+    if args.output is None:
+        print(f"Output not specified. Saving video to: {output_path}")
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    remover.process_matanyone_video(
+        fg_video_path=fg_video_path,
+        alpha_video_path=alpha_video_path,
+        output_path=output_path,
+        fps=args.fps,
+        bg_color=bg_color,
+        bg_image_path=args.bg_image,
+        keep_frames=args.keep_frames,
+        work_dir=args.work_dir,
+        output_size=output_size,
+    )
+    return 0
+
+
+def _build_matanyone_runner(args: argparse.Namespace) -> MatAnyoneRunner:
+    """Create the subprocess runner for MatAnyone-backed inference."""
+    try:
+        python_executable = resolve_matanyone_python(None, args.matanyone_python)
+        repo_root = (
+            resolve_matanyone_root(args.matanyone_root)
+            if args.matanyone_root
+            else python_executable.parent.parent
+        )
+    except ValueError:
+        repo_root = resolve_matanyone_root(args.matanyone_root)
+        python_executable = resolve_matanyone_python(repo_root, args.matanyone_python)
+
+    return MatAnyoneRunner(
+        repo_root=repo_root,
+        python_executable=python_executable,
+        device=args.matanyone_device,
+        model_name=args.matanyone_model,
+        performance_profile=args.matanyone_performance_profile,
+        sam_model_type=args.matanyone_sam_model_type,
+        cpu_threads=args.matanyone_cpu_threads,
+        frame_limit=args.matanyone_frame_limit,
+        video_target_fps=args.matanyone_video_target_fps,
+        output_fps=args.matanyone_output_fps,
+        select_frame=args.matanyone_select_frame,
+        end_frame=args.matanyone_end_frame,
+        positive_points=list(args.positive_point),
+        negative_points=list(args.negative_point),
+    )
+
+
 def run(args: argparse.Namespace) -> int:
     """Execute the CLI command."""
     from .bg_remover import VideoBackgroundRemover
@@ -371,12 +630,38 @@ def run(args: argparse.Namespace) -> int:
             "Use regular video output instead."
         )
 
-    bg_color = None
-    if args.bg_color:
-        bg_color = parse_color(args.bg_color)
+    if args.no_bg_removal and args.animated is None and args.interval is None:
+        raise ValueError(
+            "--no-bg-removal currently supports only --animated or --interval output."
+        )
+
+    if args.matanyone and args.backend == "matanyone":
+        raise ValueError(
+            "Use either --matanyone for an existing foreground/alpha pair or "
+            "--backend matanyone for running MatAnyone on a regular input, not both."
+        )
+
+    if args.backend == "matanyone" and args.no_bg_removal:
+        raise ValueError("--no-bg-removal cannot be used with --backend matanyone.")
+
+    if args.backend != "matanyone" and (
+        args.matanyone_root
+        or args.matanyone_python
+        or args.positive_point
+        or args.negative_point
+    ):
+        print(
+            "Warning: MatAnyone-specific options were provided while using the rembg backend. "
+            "They will be ignored."
+        )
+
+    bg_color = parse_color(args.bg_color) if args.bg_color else None
     output_size = parse_size(args.size) if args.size else None
 
-    print(f"Using model: {args.model}")
+    if args.backend == "matanyone":
+        print(f"Using backend: {args.backend} ({args.matanyone_model})")
+    else:
+        print(f"Using model: {args.model}")
     remover = VideoBackgroundRemover(model_name=args.model)
     run_timestamp = _build_run_timestamp()
 
@@ -385,89 +670,56 @@ def run(args: argparse.Namespace) -> int:
             args.input,
             alpha_video=args.alpha_video,
         )
-        inferred_animated = args.animated or _infer_matanyone_animated_format(
-            args.output,
-            args.format,
-        )
-
-        if inferred_animated:
-            resolved_output = resolve_output_target(
-                fg_video_path,
-                args.output,
-                animated=inferred_animated,
-                interval=args.interval,
-                run_timestamp=run_timestamp,
-                source_mode="matanyone",
-            )
-            if args.output is None:
-                print(
-                    "Output not specified. "
-                    f"Saving animated output under: {resolved_output}"
-            )
-            base_output = _normalize_animated_output(resolved_output)
-            Path(base_output).parent.mkdir(parents=True, exist_ok=True)
-            formats = ["webp", "gif"] if inferred_animated == "both" else [inferred_animated]
-            for fmt in formats:
-                remover.to_animated_from_mask_pair(
-                    fg_video_path=fg_video_path,
-                    alpha_video_path=alpha_video_path,
-                    output_path=f"{base_output}.{fmt}",
-                    fps=args.webp_fps,
-                    max_frames=args.max_frames,
-                    format=fmt,
-                    output_size=output_size,
-                )
-            return 0
-
-        if args.interval is not None:
-            output_dir = resolve_output_target(
-                fg_video_path,
-                args.output,
-                interval=args.interval,
-                output_format=args.format,
-                run_timestamp=run_timestamp,
-                source_mode="matanyone",
-            )
-            if args.output is None:
-                print(
-                    "Output not specified. "
-                    f"Saving extracted frames under: {output_dir}"
-                )
-            if not output_dir.endswith(f"_{args.format}"):
-                output_dir = f"{output_dir}_{args.format}"
-            remover.extract_matanyone_frames_interval(
-                fg_video_path=fg_video_path,
-                alpha_video_path=alpha_video_path,
-                output_dir=output_dir,
-                interval_sec=args.interval,
-                format=args.format,
-                output_size=output_size,
-            )
-            return 0
-
-        output_format = "mp4"
-        output_path = resolve_output_target(
-            fg_video_path,
-            args.output,
-            output_format=output_format,
-            run_timestamp=run_timestamp,
-            source_mode="matanyone",
-        )
-        if args.output is None:
-            print(f"Output not specified. Saving video to: {output_path}")
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        remover.process_matanyone_video(
+        return _run_matanyone_pair_pipeline(
+            remover,
+            args,
             fg_video_path=fg_video_path,
             alpha_video_path=alpha_video_path,
-            output_path=output_path,
-            fps=args.fps,
+            run_timestamp=run_timestamp,
+            output_name_source=fg_video_path,
+            source_mode="matanyone",
             bg_color=bg_color,
-            bg_image_path=args.bg_image,
-            keep_frames=args.keep_frames,
-            work_dir=args.work_dir,
             output_size=output_size,
+            allow_implicit_animated=True,
         )
-        return 0
+
+    if args.backend == "matanyone":
+        runner = _build_matanyone_runner(args)
+        temp_dir_kwargs: dict[str, str] = {}
+        if args.work_dir:
+            Path(args.work_dir).mkdir(parents=True, exist_ok=True)
+            temp_dir_kwargs["dir"] = args.work_dir
+
+        if args.keep_frames:
+            matanyone_output_root = Path(
+                tempfile.mkdtemp(prefix="matanyone_backend_", **temp_dir_kwargs)
+            )
+            output_context = nullcontext(str(matanyone_output_root))
+        else:
+            output_context = tempfile.TemporaryDirectory(
+                prefix="matanyone_backend_",
+                **temp_dir_kwargs,
+            )
+
+        with output_context as temp_output_root:
+            result = runner.run(args.input, temp_output_root)
+            if args.keep_frames:
+                print(
+                    "Keeping MatAnyone intermediate outputs under: "
+                    f"{result.output_dir}"
+                )
+            return _run_matanyone_pair_pipeline(
+                remover,
+                args,
+                fg_video_path=str(result.foreground_path),
+                alpha_video_path=str(result.alpha_path),
+                run_timestamp=run_timestamp,
+                output_name_source=args.input,
+                source_mode="rembg",
+                bg_color=bg_color,
+                output_size=output_size,
+                allow_implicit_animated=False,
+            )
 
     if args.animated:
         resolved_output = resolve_output_target(
@@ -494,6 +746,8 @@ def run(args: argparse.Namespace) -> int:
                 max_frames=args.max_frames,
                 format=fmt,
                 output_size=output_size,
+                remove_background=not args.no_bg_removal,
+                corner_radius=args.corner_radius,
             )
         return 0
 
@@ -520,6 +774,8 @@ def run(args: argparse.Namespace) -> int:
             interval_sec=args.interval,
             format=args.format,
             output_size=output_size,
+            remove_background=not args.no_bg_removal,
+            corner_radius=args.corner_radius,
         )
         return 0
 

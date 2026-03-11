@@ -18,12 +18,15 @@
 
 A Python CLI tool that removes backgrounds from videos using `rembg` and `OpenCV`. It supports full video export, transparent frame extraction, animated WebP / GIF generation, and MatAnyone foreground+alpha pair conversion.
 
+It can also run `MatAnyone 2` through the published [`matanyone2-runtime`](https://pypi.org/project/matanyone2-runtime/) package when you provide a Python executable where `matanyone2-runtime>=0.2.0` is installed.
+
 ## ✨ Features
 
 - Split a video into frames, remove the background, and rebuild it as a video
 - Export transparent `webp` / `png` frames at fixed intervals
 - Generate transparent animated `webp` / `gif`
 - Convert MatAnyone `*_fg.mp4` + `*_alpha.mp4` pairs into transparent `webp` / `gif`
+- Clean green-screen fringes from MatAnyone edges before applying transparency
 - Replace the removed background with a solid color or background image
 - Switch between `isnet-general-use`, `u2net`, `u2netp`, `u2net_human_seg`, and `silueta`
 
@@ -77,6 +80,20 @@ video-background-remover assets/onizuka_idle_motion.mp4 output/frames --interval
 
 ```bash
 video-background-remover assets/MatAnyone --matanyone output/matanyone.webp
+```
+
+### 5. Export a compact MatAnyone preview
+
+```bash
+video-background-remover assets/MatAnyone --matanyone output/matanyone_5fps_300.webp --webp-fps 5 --size 300x300
+```
+
+### 6. Run MatAnyone directly from the PyPI package
+
+Install `matanyone2-runtime>=0.2.0` into a Python 3.10 environment first, then point this CLI at that interpreter:
+
+```bash
+video-background-remover input.mp4 output/matanyone.webp --backend matanyone --matanyone-python C:\path\to\python.exe --animated webp
 ```
 
 ## 💡 Usage
@@ -136,7 +153,11 @@ Examples:
 
 ```bash
 video-background-remover assets/MatAnyone --matanyone output/matanyone.webp
+video-background-remover assets/MatAnyone --matanyone output/matanyone_2fps_300.webp --webp-fps 2 --size 300x300
+video-background-remover assets/MatAnyone --matanyone output/matanyone_5fps_300.webp --webp-fps 5 --size 300x300
+video-background-remover assets/MatAnyone --matanyone output/matanyone_10fps_300.webp --webp-fps 10 --size 300x300
 video-background-remover assets/MatAnyone/grok-video-e3987723-09fa-4c1e-a054-eb82a7c13e8f.mp4_fg.mp4 --matanyone output/matanyone.gif --animated gif
+video-background-remover assets/MatAnyone --matanyone output/matanyone_10fps_300.gif --animated gif --webp-fps 10 --size 300x300
 video-background-remover assets/MatAnyone --matanyone output/matanyone.mp4 --bg-color white
 video-background-remover assets/MatAnyone --matanyone output/matanyone_frames --interval 0.5 --format png
 ```
@@ -145,15 +166,43 @@ Notes:
 
 - Transparent alpha is preserved for animated `webp`, animated `gif`, and interval frame export.
 - In `--matanyone` mode, `.webp` output uses the provided alpha mask to build transparent frames.
+- The MatAnyone pipeline removes the baked green matte from semi-transparent edges before export.
+- `--size 300x300` with `--webp-fps 5` is a good default for compact previews.
 - Regular `mp4` does not preserve alpha. The tool composites transparent pixels onto `--bg-color`, `--bg-image`, or black when neither is specified.
+
+### MatAnyone package backend
+
+Use `--backend matanyone` when you want this project to invoke the published `matanyone2-runtime` package and generate the foreground and alpha pair for you.
+
+Examples:
+
+```bash
+video-background-remover input.mp4 output/out.webp --backend matanyone --matanyone-python C:\path\to\python.exe --animated webp
+video-background-remover input.mp4 output/out.gif --backend matanyone --matanyone-python C:\path\to\python.exe --animated gif --positive-point 320,180
+video-background-remover input.mp4 output/out.mp4 --backend matanyone --matanyone-python C:\path\to\python.exe --bg-color white
+```
+
+Notes:
+
+- `--matanyone-python` should point to a Python where `matanyone2-runtime>=0.2.0` is installed.
+- `--matanyone-root` is only a fallback for discovering a sibling `.venv`; it is not required for normal PyPI usage.
+- The package backend imports `matanyone2.run_pipeline()` inside the target Python instead of shelling out to the package CLI.
 
 ## ⚙️ Options
 
 | Option | Description |
 | --- | --- |
 | `--model` | Background removal model. Default: `isnet-general-use` |
+| `--backend` | Regular input backend: `rembg` or `matanyone` |
 | `--matanyone` | Treat `INPUT` as a MatAnyone directory or `*_fg.*` foreground video and use the matching `*_alpha.*` video |
 | `--alpha-video` | Explicit alpha/mask video path for `--matanyone` mode |
+| `--matanyone-python` | Python executable where `matanyone2-runtime` is installed |
+| `--matanyone-model` | Package model name for the MatAnyone backend |
+| `--matanyone-device` | Device for the MatAnyone backend: `auto`, `cpu`, or `cuda` |
+| `--matanyone-performance-profile` | Performance profile forwarded to `matanyone2-runtime` |
+| `--matanyone-sam-model-type` | SAM model type forwarded to `matanyone2-runtime` |
+| `--positive-point` | Positive click prompt for the MatAnyone backend |
+| `--negative-point` | Negative click prompt for the MatAnyone backend |
 | `--fps` | FPS for regular video output. Defaults to the input video's FPS |
 | `--bg-color` | Background color. Supports `white`, `black`, `green`, `blue`, `red`, `gray`, `transparent`, or `255,128,0` |
 | `--bg-image` | Path to a background image |
@@ -165,6 +214,8 @@ Notes:
 | `--animated` | Animated output mode: `webp`, `gif`, or `both` |
 | `--webp-fps` | FPS for animated output |
 | `--max-frames` | Maximum number of frames for animated output |
+| `--no-bg-removal` | Keep the original content when exporting animated files or interval frames |
+| `--corner-radius` | Apply transparent rounded corners to WebP, GIF, and PNG outputs |
 
 ## 🧠 Models
 
@@ -237,6 +288,10 @@ The script regenerates:
 - Input video: `assets/onizuka_idle_motion.mp4`
 - Animated WebP: `example/output_animated.webp`
 - GIF: `output/output.gif`
+- MatAnyone WebP 2 FPS / 300 px: `output/matanyone_full_2fps_300.webp`
+- MatAnyone WebP 5 FPS / 300 px: `output/matanyone_full_5fps_300.webp`
+- MatAnyone WebP 10 FPS / 300 px: `output/matanyone_full_10fps_300.webp`
+- MatAnyone GIF 10 FPS / 300 px: `output/matanyone_full_10fps_300.gif`
 - Comparison GIF: `example/onizuka_walk_motion.gif`
 - Comparison WebP: `example/onizuka_walk_motion.webp`
 - Transparent frames: `output_frames_webp/`
@@ -253,6 +308,7 @@ The script regenerates:
 - Long videos exported as `--animated gif` can become large
 - If you need transparency, prefer `--animated webp` or `--interval` output instead of regular video export
 - If you already have MatAnyone foreground and alpha videos, prefer `--matanyone` because it skips `rembg` inference entirely
+- MatAnyone exports usually look good around `300x300` with `5fps`, while `10fps` is smoother but larger
 
 ## 🎨 Documentation Color Map
 

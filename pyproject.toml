@@ -35,10 +35,15 @@ dev = [
     "build>=1.2.2",
     "twine>=6.1.0",
 ]
+webui = [
+    "gradio==4.31.0",
+]
 
 [project.scripts]
 video-background-remover = "video_background_remover_cli.cli:main"
 vbr = "video_background_remover_cli.cli:main"
+video-background-remover-webui = "video_background_remover_cli.webui:main"
+vbr-webui = "video_background_remover_cli.webui:main"
 
 [project.urls]
 Homepage = "https://github.com/sunwood-ai-labs/video-background-remover-cli"

@@ -58,6 +58,28 @@ uv sync --extra dev
 
 ## 🚀 Quick Start
 
+### Launch the Gradio WebUI
+
+The repository now includes a Gradio app that mirrors the MatAnyone Video/Image workflow and adds post-export helpers for animated `webp`, animated `gif`, zipped transparent frame exports, flattened `mp4`, and transparent `webm`.
+
+Recommended launch command when you already have `D:\Prj\MatAnyone` set up:
+
+```powershell
+uv run --python D:\Prj\MatAnyone\.venv\Scripts\python.exe -m video_background_remover_cli.webui --port 7860
+```
+
+If you installed this project as a package, you can also use:
+
+```powershell
+video-background-remover-webui --port 7860
+```
+
+Notes:
+
+- The WebUI auto-delegates into the MatAnyone Python environment so the original interactive SAM/matting workflow stays available.
+- Image outputs are saved as `png` and `webp`.
+- Video outputs keep the original foreground/alpha pair and can then be exported as `webp`, `gif`, `png` frame ZIPs, `mp4`, or `webm`.
+
 ### 1. Export a video with a white background
 
 ```bash

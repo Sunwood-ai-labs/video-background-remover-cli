@@ -54,6 +54,28 @@ uv sync --extra dev
 
 ## 🚀 Quick Start
 
+### Gradio WebUI を起動
+
+MatAnyone の Video / Image ワークフローをそのまま使いながら、追加でアニメーション `webp`、アニメーション `gif`、透過フレーム ZIP、`mp4`、透過 `webm` を書き出せる Gradio アプリを同梱しました。
+
+`D:\Prj\MatAnyone` をセットアップ済みなら、次の起動がいちばん確実です。
+
+```powershell
+uv run --python D:\Prj\MatAnyone\.venv\Scripts\python.exe -m video_background_remover_cli.webui --port 7860
+```
+
+パッケージとして入れている場合は、次のコマンドでも起動できます。
+
+```powershell
+video-background-remover-webui --port 7860
+```
+
+補足:
+
+- WebUI は自動で MatAnyone 側の Python に委譲するので、元アプリのインタラクティブな SAM / matting 操作をそのまま使えます。
+- 画像出力は `png` と `webp` を保存します。
+- 動画出力は foreground / alpha のペアを保持したうえで、`webp`、`gif`、`png` フレーム ZIP、`mp4`、`webm` に再書き出しできます。
+
 ### 1. 背景を白で埋めた動画を出力
 
 ```bash

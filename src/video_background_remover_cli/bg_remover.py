@@ -16,7 +16,6 @@ import subprocess
 import cv2
 import numpy as np
 from PIL import Image, ImageChops, ImageDraw
-from rembg import remove, new_session
 from tqdm import tqdm
 from pathlib import Path
 
@@ -39,6 +38,13 @@ class VideoBackgroundRemover:
     def _get_session(self):
         """Create the rembg session on first use."""
         if self.session is None:
+            try:
+                from rembg import new_session
+            except ImportError as exc:
+                raise RuntimeError(
+                    "Background removal requires the 'rembg' package. "
+                    "Install the CLI dependencies and try again."
+                ) from exc
             self.session = new_session(self.model_name)
         return self.session
 
@@ -581,6 +587,13 @@ class VideoBackgroundRemover:
             pil_image = Image.fromarray(rgb_frame)
 
         # Remove background using RMBG-1.4
+        try:
+            from rembg import remove
+        except ImportError as exc:
+            raise RuntimeError(
+                "Background removal requires the 'rembg' package. "
+                "Install the CLI dependencies and try again."
+            ) from exc
         output = remove(pil_image, session=self._get_session())
 
         # Save if output path provided

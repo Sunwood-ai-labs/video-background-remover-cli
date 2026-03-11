@@ -170,6 +170,23 @@ Notes:
 - `--size 300x300` with `--webp-fps 5` is a good default for compact previews.
 - Regular `mp4` does not preserve alpha. The tool composites transparent pixels onto `--bg-color`, `--bg-image`, or black when neither is specified.
 
+#### Green Fringe Cleanup Preview
+
+The MatAnyone exporter keeps a dedicated edge-cleanup pass for baked green matte contamination. This comparison shows four cleanup strengths on `assets/MatAnyone_cat3`; `strong` and `trim` push hardest against visible green spill, while `soft` keeps the fullest whiskers and fur edges.
+
+<p align="center">
+  <img src="docs/public/media/matanyone/green-cleanup-preview.png" alt="MatAnyone green cleanup profile comparison" width="720">
+</p>
+
+The residual map below highlights the small edge pixels where green is still stronger than red/blue after cleanup. It is useful when deciding whether to preserve a thin whisker edge or trim alpha a bit more aggressively.
+
+<p align="center">
+  <img src="docs/public/media/matanyone/green-residual-map.png" alt="MatAnyone residual green edge map" width="720">
+</p>
+
+- When you compare cleanup candidates, encode the profile or tuning values in the filename, for example `MatAnyone_cat3_trim_sm0_gb4_rb60_as180_am120_md255.webp`.
+- The token convention used here is `sm=spill margin`, `gb=green bias`, `rb=red boost`, `as=alpha spill`, `am=alpha matte`, and `md=max drop`.
+
 ### MatAnyone package backend
 
 Use `--backend matanyone` when you want this project to invoke the published `matanyone2-runtime` package and generate the foreground and alpha pair for you.

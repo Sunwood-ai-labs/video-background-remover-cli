@@ -71,6 +71,8 @@ Notes:
 - `--size 300x300` with `--webp-fps 5` is a good default for compact previews.
 - Regular `mp4` does not preserve alpha. The tool composites transparent pixels onto `--bg-color`, `--bg-image`, or black when neither is specified.
 
+When you export several MatAnyone cleanup trials, encode the profile or tuning values in the output filename so the comparison stays reproducible, for example `MatAnyone_cat3_trim_sm0_gb4_rb60_as180_am120_md255.webp`.
+
 ## MatAnyone Package Backend
 
 Use `--backend matanyone` when you want this CLI to import the published `matanyone2-runtime` package and generate the foreground and alpha pair for the current input.

@@ -4,6 +4,8 @@ import sys
 import tempfile
 import unittest
 
+import numpy as np
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -21,6 +23,7 @@ from video_background_remover_cli.cli import (
     resolve_matanyone_inputs,
     resolve_output_target,
 )
+from video_background_remover_cli.bg_remover import VideoBackgroundRemover
 
 
 class ParseColorTests(unittest.TestCase):
@@ -210,6 +213,28 @@ class MatAnyoneResolutionTests(unittest.TestCase):
                 resolve_matanyone_inputs(str(fg_path)),
                 (str(fg_path), str(alpha_path)),
             )
+
+
+class MatAnyoneCleanupTests(unittest.TestCase):
+    def test_combine_matanyone_frames_reduces_green_spill_on_edges(self) -> None:
+        remover = VideoBackgroundRemover()
+        matte_bgr = np.array([154, 254, 120], dtype=np.uint8)
+        fg_frame = np.full((7, 7, 3), matte_bgr, dtype=np.uint8)
+        fg_frame[1:6, 1:6] = np.array([120, 210, 135], dtype=np.uint8)
+        fg_frame[2:5, 2:5] = np.array([160, 180, 220], dtype=np.uint8)
+
+        alpha_channel = np.zeros((7, 7), dtype=np.uint8)
+        alpha_channel[1:6, 1:6] = 200
+        alpha_channel[2:5, 2:5] = 255
+        alpha_frame = np.dstack([alpha_channel] * 3)
+
+        rgba = remover._combine_matanyone_frames(fg_frame, alpha_frame)
+        edge_pixel = rgba[1, 3]
+        center_pixel = rgba[3, 3]
+
+        self.assertLessEqual(int(edge_pixel[1]), int(max(edge_pixel[0], edge_pixel[2])) + 10)
+        self.assertLess(int(edge_pixel[3]), 200)
+        self.assertEqual(int(center_pixel[3]), 255)
 
 
 if __name__ == "__main__":

@@ -23,6 +23,8 @@
 - 動画をフレーム分解して背景除去し、動画として再構成
 - 一定間隔ごとに透過 `webp` / `png` フレームを書き出し
 - 透過を維持したアニメーション `webp` / `gif` を生成
+- MatAnyone の `*_fg.mp4` + `*_alpha.mp4` ペアを透過 `webp` / `gif` に変換
+- MatAnyone の半透明エッジに焼き付いた緑背景を軽減
 - 単色背景または背景画像への差し替えに対応
 - `isnet-general-use` / `u2net` / `u2netp` / `u2net_human_seg` / `silueta` を切り替え可能
 
@@ -70,6 +72,12 @@ video-background-remover assets/onizuka_idle_motion.mp4 output/output_animated.w
 video-background-remover assets/onizuka_idle_motion.mp4 output/frames --interval 1 --format webp
 ```
 
+### 4. MatAnyone の前景 + alpha ペアから透過 WebP を出力
+
+```bash
+video-background-remover assets/MatAnyone --matanyone output/matanyone.webp
+```
+
 ## 💡 Usage
 
 ```bash
@@ -104,6 +112,43 @@ video-background-remover input.mp4 output/output --animated both --webp-fps 8 --
 ```
 
 `--animated both` を指定すると、同じベース名で `.webp` と `.gif` の両方を出力します。
+
+### MatAnyone の前景 + alpha ペア出力
+
+`--matanyone` は次のどちらかを `INPUT` に渡すと使えます。
+
+- `*_fg.*` と対応する `*_alpha.*` を含むディレクトリ
+- `clip_fg.mp4` のような前景動画ファイル
+
+```bash
+video-background-remover assets/MatAnyone --matanyone output/matanyone.webp
+video-background-remover assets/MatAnyone --matanyone output/matanyone_5fps_300.webp --webp-fps 5 --size 300x300
+video-background-remover assets/MatAnyone/sample_fg.mp4 --matanyone --alpha-video assets/MatAnyone/sample_alpha.mp4 output/matanyone.gif --animated gif
+```
+
+補足:
+
+- 透過アルファはアニメーション `webp`、アニメーション `gif`、間引きフレーム出力で保持されます。
+- `.webp` 出力では、与えられたマスク動画を使って透明部分を作成します。
+- 半透明の縁では、焼き付いた緑背景を軽減する補正を入れています。
+- コンパクトなプレビュー用途なら `--size 300x300` と `--webp-fps 5` の組み合わせがおすすめです。
+
+#### 緑フリンジ補正の比較
+
+MatAnyone 出力では、緑縁を抑えるためのエッジ補正を残しています。下の比較画像は `assets/MatAnyone_cat3` に対して `soft` / `balanced` / `strong` / `trim` の4段階で補正した例です。
+
+<p align="center">
+  <img src="docs/public/media/matanyone/green-cleanup-preview.png" alt="MatAnyone 緑フリンジ補正の比較" width="720">
+</p>
+
+残留マップでは、まだ `G > max(R, B)` になっている輪郭ピクセルを強調しています。ヒゲや毛先をどこまで残すか、あるいはアルファをさらに削るかを判断するときの確認用です。
+
+<p align="center">
+  <img src="docs/public/media/matanyone/green-residual-map.png" alt="MatAnyone 緑成分の残留マップ" width="720">
+</p>
+
+- 比較用の出力は、`MatAnyone_cat3_trim_sm0_gb4_rb60_as180_am120_md255.webp` のように補正内容をファイル名に含めると追跡しやすくなります。
+- 略称は `sm=spill margin`、`gb=green bias`、`rb=red boost`、`as=alpha spill`、`am=alpha matte`、`md=max drop` です。
 
 ## ⚙️ Options
 

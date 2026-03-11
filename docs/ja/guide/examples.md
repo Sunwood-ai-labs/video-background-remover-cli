@@ -7,13 +7,74 @@
 | 入力動画 | `assets/onizuka_idle_motion.mp4` |
 | アニメーション WebP | `example/output_animated.webp` |
 | GIF | `output/output.gif` |
-| 比較 GIF | `example/onizuka_walk_motion.gif` |
-| 比較 WebP | `example/onizuka_walk_motion.webp` |
+| MatAnyone WebP 2 FPS / 300 px | `output/matanyone_full_2fps_300.webp` |
+| MatAnyone WebP 5 FPS / 300 px | `output/matanyone_full_5fps_300.webp` |
+| MatAnyone WebP 10 FPS / 300 px | `output/matanyone_full_10fps_300.webp` |
+| MatAnyone GIF 10 FPS / 300 px | `output/matanyone_full_10fps_300.gif` |
+| 比較用 GIF | `example/onizuka_walk_motion.gif` |
+| 比較用 WebP | `example/onizuka_walk_motion.webp` |
 | 透過フレーム | `output_frames_webp/` |
 
-## 実験: 炎エフェクト付き動画
+## MatAnyone レシピ
 
-検証素材: `assets/onizuka_fire_motion.mp4`
+### 前景動画 + マスク動画から透過 WebP を作る
+
+```bash
+python main.py assets/MatAnyone --matanyone output/matanyone.webp
+```
+
+### 軽量プレビュー: 5 FPS / 300 px
+
+```bash
+python main.py assets/MatAnyone --matanyone output/matanyone_5fps_300.webp --webp-fps 5 --size 300x300
+```
+
+### さらに軽いプレビュー: 2 FPS / 300 px
+
+```bash
+python main.py assets/MatAnyone --matanyone output/matanyone_2fps_300.webp --webp-fps 2 --size 300x300
+```
+
+### より滑らかなプレビュー: 10 FPS / 300 px
+
+```bash
+python main.py assets/MatAnyone --matanyone output/matanyone_10fps_300.webp --webp-fps 10 --size 300x300
+```
+
+### 10 FPS の GIF を作る
+
+```bash
+python main.py assets/MatAnyone --matanyone output/matanyone_10fps_300.gif --animated gif --webp-fps 10 --size 300x300
+```
+
+### 白背景の MP4 にフラット化する
+
+```bash
+python main.py assets/MatAnyone --matanyone output/matanyone.mp4 --bg-color white
+```
+
+### MatAnyone 入力に関するメモ
+
+- マスク動画の白い部分は残り、黒い部分は透明になります。
+- 半透明エッジでは、焼き付いた緑背景を軽減する補正を行っています。
+- プレビュー用途では `300x300` と `5fps` の組み合わせがバランス良好です。
+
+### 緑フリンジ補正の比較
+
+この比較画像は `assets/MatAnyone_cat3` に対して `soft` / `balanced` / `strong` / `trim` の4段階で補正した例です。`soft` は輪郭を残しやすく、`strong` と `trim` はヒゲやしっぽの緑縁をより強く抑えます。
+
+![MatAnyone 緑フリンジ補正の比較](/media/matanyone/green-cleanup-preview.png)
+
+残留マップでは、補正後も `G > max(R, B)` になっている輪郭ピクセルを強調しています。見た目だけでは判断しづらい細い緑縁の確認に使えます。
+
+![MatAnyone 緑成分の残留マップ](/media/matanyone/green-residual-map.png)
+
+- 比較用の出力は `MatAnyone_cat3_trim_sm0_gb4_rb60_as180_am120_md255.webp` のように補正内容をファイル名へ入れると追跡しやすくなります。
+- 略称は `sm=spill margin`、`gb=green bias`、`rb=red boost`、`as=alpha spill`、`am=alpha matte`、`md=max drop` です。
+
+## 実験: 炎エフェクト付きクリップ
+
+検証クリップ: `assets/onizuka_fire_motion.mp4`
 
 使用した設定:
 
@@ -21,124 +82,43 @@
 python main.py assets/onizuka_fire_motion.mp4 output/model.webp --animated webp --webp-fps 8 --model <model>
 ```
 
-### 要点
+### まとめ
 
-- この素材では `silueta` が最もバランスの良い結果でした。
-- `u2net` は輪郭が安定しますが、炎のオーラはかなり消えます。
-- `u2net_human_seg` はエフェクトの強いこのサンプルには不向きでした。
+- このクリップでは `silueta` が最もバランス良く仕上がりました。
+- `u2net` はシルエットの安定性は高いですが、炎のオーラがかなり消えます。
+- `u2net_human_seg` はこのスタイルの強い映像には向いていません。
 
-### モデル別プレビュー
+### モデル比較
 
-| Model | WebP | 実行時間 | メモ |
+| Model | Preview | Runtime | Notes |
 | --- | --- | ---: | --- |
-| `isnet-general-use` | <img src="/experiments/onizuka_fire_motion/isnet-general-use.webp" alt="isnet-general-use result" width="180"> | 114.44s | 炎の成分を少し残す一方で、輪郭まわりにノイズも残ります。 |
-| `u2net` | <img src="/experiments/onizuka_fire_motion/u2net.webp" alt="u2net result" width="180"> | 76.42s | シルエットは安定しますが、炎のオーラはほぼ消えます。 |
-| `u2netp` | <img src="/experiments/onizuka_fire_motion/u2netp.webp" alt="u2netp result" width="180"> | 30.11s | 最速ですが、難しいフレームで崩れやすいです。 |
-| `u2net_human_seg` | <img src="/experiments/onizuka_fire_motion/u2net_human_seg.webp" alt="u2net human seg result" width="180"> | 69.97s | このスタイライズされた動画では人物自体を大きく落とします。 |
-| `silueta` | <img src="/experiments/onizuka_fire_motion/silueta.webp" alt="silueta result" width="180"> | 69.27s | 形状維持とノイズ抑制のバランスが最も良好でした。 |
+| `isnet-general-use` | <img src="/experiments/onizuka_fire_motion/isnet-general-use.webp" alt="isnet-general-use result" width="180"> | 114.44s | 効果表現を少し残す一方で、輪郭周辺にノイズが残ります。 |
+| `u2net` | <img src="/experiments/onizuka_fire_motion/u2net.webp" alt="u2net result" width="180"> | 76.42s | シルエットは安定しますが、炎のオーラはかなり消えます。 |
+| `u2netp` | <img src="/experiments/onizuka_fire_motion/u2netp.webp" alt="u2netp result" width="180"> | 30.11s | 最速ですが、難しいフレームでは品質が落ちます。 |
+| `u2net_human_seg` | <img src="/experiments/onizuka_fire_motion/u2net_human_seg.webp" alt="u2net human seg result" width="180"> | 69.97s | このスタイルでは人物の保持が不十分です。 |
+| `silueta` | <img src="/experiments/onizuka_fire_motion/silueta.webp" alt="silueta result" width="180"> | 69.27s | 形状保持とノイズ除去のバランスが最も良好でした。 |
 
-### フレーム比較シート
+### 比較シート
 
 ![Comparison sheet](/experiments/onizuka_fire_motion/comparison_sheet.png)
 
-1.0s、3.0s、5.0s、7.0s、9.0s の代表フレームを並べています。どのタイミングで炎が消えるか、どこで被写体が崩れるかをまとめて確認できます。
-
-### マスク比較シート
+### マスク比較
 
 ![Mask comparison](/experiments/onizuka_fire_motion/comparison_masks.png)
 
-アルファマスクを見ると、`u2net_human_seg` がこの素材では大きく崩れている一方で、`silueta`、`u2net`、`isnet-general-use` は被写体の面積を比較的維持しています。
+### 実験の再実行
 
-### 実験の再実行方法
-
-追跡している実験定義は `experiments/onizuka_fire_motion/` にあります。
+実験設定は `experiments/onizuka_fire_motion/` にあります。
 
 - スクリプト: `experiments/onizuka_fire_motion/run_experiment.py`
 - 設定: `experiments/onizuka_fire_motion/experiment_config.json`
-- 手順メモ: `experiments/onizuka_fire_motion/README.md`
+- メモ: `experiments/onizuka_fire_motion/README.md`
 - 出力先: `output/model_experiments/onizuka_fire_motion/`
 
-リポジトリのルートから実行:
+リポジトリルートで次を実行します。
 
 ```bash
 python experiments/onizuka_fire_motion/run_experiment.py
 ```
 
-あとでモデルを追加したい場合は `experiments/onizuka_fire_motion/experiment_config.json` の `models` に名前を追加して、同じコマンドを再実行してください。
-
-再生成されるもの:
-
-- `<model>_anim.webp`
-- `<model>_anim_frames/`
-- `results.csv`
-- `alpha_stats.csv`
-- `comparison_sheet.png`
-- `comparison_masks.png`
-
-## レシピ: 白背景の動画
-
-背景を除去して白で埋めた動画を書き出します。
-
-```bash
-python main.py input.mp4 output_white.mp4 --bg-color white
-```
-
-## レシピ: 背景画像の合成
-
-任意の背景画像へ被写体を合成します。
-
-```bash
-python main.py input.mp4 output_bg.mp4 --bg-image background.jpg
-```
-
-## レシピ: 透過アニメーション WebP
-
-透過付きのループ WebP を 10 FPS で出力します。
-
-```bash
-python main.py input.mp4 output_animated.webp --animated webp --webp-fps 10
-```
-
-## レシピ: アニメーション GIF
-
-GIF を出力します。GIF は半透明を保持できません。
-
-```bash
-python main.py input.mp4 output.gif --animated gif --webp-fps 8
-```
-
-## レシピ: WebP と GIF の同時出力
-
-1 回の実行で両方の形式を書き出します。
-
-```bash
-python main.py input.mp4 output/output --animated both --webp-fps 8 --max-frames 120
-```
-
-## レシピ: フレーム抽出
-
-0.5 秒ごとに透過 PNG フレームを書き出します。
-
-```bash
-python main.py input.mp4 output/frames --interval 0.5 --format png
-```
-
-1 秒ごとに透過 WebP フレームを書き出します。
-
-```bash
-python main.py input.mp4 output/frames --interval 1 --format webp
-```
-
-## レシピ: モデル指定
-
-人物向けモデルを指定して処理します。
-
-```bash
-python main.py input.mp4 output.mp4 --model u2net_human_seg --bg-color white
-```
-
-## 注意
-
-- モデルの初回読み込みには時間がかかることがあります。
-- 長い動画を `--animated gif` で出力するとファイルサイズが大きくなりやすいです。
-- 透過を使いたい場合は通常動画よりも `--animated webp` または `--interval` 出力が向いています。
+追加モデルを試す場合は、`experiments/onizuka_fire_motion/experiment_config.json` の `models` 配列に追加してから再実行してください。

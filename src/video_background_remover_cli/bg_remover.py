@@ -15,7 +15,7 @@ import shutil
 import subprocess
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageChops, ImageDraw
 from rembg import remove, new_session
 from tqdm import tqdm
 from pathlib import Path
@@ -34,6 +34,7 @@ class VideoBackgroundRemover:
         """
         self.model_name = model_name
         self.session = None
+        self._rounded_mask_cache: dict[tuple[int, int, int], Image.Image] = {}
 
     def _get_session(self):
         """Create the rembg session on first use."""
@@ -89,6 +90,89 @@ class VideoBackgroundRemover:
         width, height = output_size
         return cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
 
+    def _normalize_corner_radius(
+        self,
+        corner_radius: int = 0,
+        size: tuple[int, int] | None = None,
+    ) -> int:
+        """Clamp a corner radius to the valid range for a frame size."""
+        if corner_radius < 0:
+            raise ValueError("--corner-radius must be 0 or a positive integer.")
+
+        if size is None:
+            return corner_radius
+
+        width, height = size
+        return min(corner_radius, width // 2, height // 2)
+
+    def _get_rounded_corner_mask(
+        self,
+        size: tuple[int, int],
+        corner_radius: int = 0,
+    ) -> Image.Image | None:
+        """Build and cache an anti-aliased rounded-rectangle alpha mask."""
+        normalized_radius = self._normalize_corner_radius(
+            corner_radius,
+            size=size,
+        )
+        if normalized_radius <= 0:
+            return None
+
+        width, height = size
+        cache_key = (width, height, normalized_radius)
+        cached = self._rounded_mask_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        scale = 4
+        mask = Image.new("L", (width * scale, height * scale), 0)
+        draw = ImageDraw.Draw(mask)
+        scaled_radius = normalized_radius * scale
+        draw.rounded_rectangle(
+            (0, 0, width * scale - 1, height * scale - 1),
+            radius=scaled_radius,
+            fill=255,
+        )
+        mask = mask.resize((width, height), Image.Resampling.LANCZOS)
+        self._rounded_mask_cache[cache_key] = mask
+        return mask
+
+    def _apply_corner_radius(
+        self,
+        frame: Image.Image,
+        corner_radius: int = 0,
+    ) -> Image.Image:
+        """Apply a transparent rounded-rectangle mask to an RGBA frame."""
+        rgba_frame = frame.convert("RGBA")
+        mask = self._get_rounded_corner_mask(
+            rgba_frame.size,
+            corner_radius=corner_radius,
+        )
+        if mask is None:
+            return rgba_frame
+
+        alpha = ImageChops.multiply(rgba_frame.getchannel("A"), mask)
+        rounded = rgba_frame.copy()
+        rounded.putalpha(alpha)
+        return rounded
+
+    def _to_rgba_image(
+        self,
+        frame: np.ndarray,
+        *,
+        output_size: tuple[int, int] | None = None,
+        remove_background: bool = True,
+        corner_radius: int = 0,
+    ) -> Image.Image:
+        """Convert one video frame into an RGBA PIL image ready for export."""
+        frame = self._resize_frame(frame, output_size=output_size)
+        if remove_background:
+            rgba_frame = Image.fromarray(self.remove_background_from_frame(frame))
+        else:
+            rgba_frame = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA))
+
+        return self._apply_corner_radius(rgba_frame, corner_radius=corner_radius)
+
     def _extract_mask_channel(self, mask_frame: np.ndarray) -> np.ndarray:
         """Extract a single alpha channel from a MatAnyone mask frame."""
         if mask_frame.ndim == 2:
@@ -117,9 +201,11 @@ class VideoBackgroundRemover:
         self,
         fg_frame: np.ndarray,
         alpha_channel: np.ndarray,
+        matte_bgr: np.ndarray | None = None,
     ) -> np.ndarray:
         """Remove baked background color from semi-transparent edge pixels."""
-        matte_bgr = self._estimate_background_color(fg_frame, alpha_channel)
+        if matte_bgr is None:
+            matte_bgr = self._estimate_background_color(fg_frame, alpha_channel)
         alpha = alpha_channel.astype(np.float32) / 255.0
         alpha_3 = alpha[:, :, None]
 
@@ -133,6 +219,73 @@ class VideoBackgroundRemover:
 
         restored[alpha <= 0.0] = 0.0
         return restored.astype(np.uint8)
+
+    def _suppress_green_spill(
+        self,
+        fg_frame: np.ndarray,
+        cleaned_fg: np.ndarray,
+        alpha_channel: np.ndarray,
+        matte_bgr: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Reduce green-screen spill on the MatAnyone edge band."""
+        edge_seed = (alpha_channel < 255).astype(np.uint8)
+        if not np.any(edge_seed):
+            return cleaned_fg, alpha_channel
+
+        edge_band = cv2.dilate(edge_seed, np.ones((3, 3), dtype=np.uint8), iterations=2)
+        edge_band = edge_band.astype(bool) & (alpha_channel > 0)
+        if not np.any(edge_band):
+            return cleaned_fg, alpha_channel
+
+        cleaned_float = cleaned_fg.astype(np.float32)
+        source_float = fg_frame.astype(np.float32)
+        alpha_float = alpha_channel.astype(np.float32)
+
+        blue = cleaned_float[:, :, 0]
+        green = cleaned_float[:, :, 1]
+        red = cleaned_float[:, :, 2]
+        red_blue_max = np.maximum(red, blue)
+        spill = np.clip(green - red_blue_max - 4.0, 0.0, 255.0)
+
+        matte_distance = np.linalg.norm(source_float - matte_bgr[None, None, :], axis=2)
+        matte_like = np.clip(1.0 - matte_distance / 90.0, 0.0, 1.0)
+        spill_mask = edge_band & ((spill > 0.0) | (matte_like > 0.2))
+        if not np.any(spill_mask):
+            return cleaned_fg, alpha_channel
+
+        green_limit = (
+            0.6 * red_blue_max + 0.2 * red + 0.2 * blue + 10.0
+        )
+        cleaned_float[:, :, 1][spill_mask] = np.minimum(
+            green[spill_mask],
+            green_limit[spill_mask],
+        )
+
+        boost = spill * 0.45
+        cleaned_float[:, :, 2][spill_mask] = np.clip(
+            red[spill_mask] + boost[spill_mask],
+            0.0,
+            255.0,
+        )
+        cleaned_float[:, :, 0][spill_mask] = np.clip(
+            blue[spill_mask] + boost[spill_mask] * 0.2,
+            0.0,
+            255.0,
+        )
+
+        alpha_adjusted = alpha_float.copy()
+        alpha_drop = np.clip(
+            (spill / 120.0) * 110.0 + matte_like * 70.0,
+            0.0,
+            180.0,
+        )
+        alpha_adjusted[spill_mask] = np.clip(
+            alpha_adjusted[spill_mask] - alpha_drop[spill_mask],
+            0.0,
+            255.0,
+        )
+
+        return cleaned_float.astype(np.uint8), alpha_adjusted.astype(np.uint8)
 
     def _combine_matanyone_frames(
         self,
@@ -152,7 +305,18 @@ class VideoBackgroundRemover:
             )
 
         alpha_channel = self._extract_mask_channel(alpha_frame)
-        cleaned_fg = self._decontaminate_foreground(fg_frame, alpha_channel)
+        matte_bgr = self._estimate_background_color(fg_frame, alpha_channel)
+        cleaned_fg = self._decontaminate_foreground(
+            fg_frame,
+            alpha_channel,
+            matte_bgr=matte_bgr,
+        )
+        cleaned_fg, alpha_channel = self._suppress_green_spill(
+            fg_frame,
+            cleaned_fg,
+            alpha_channel,
+            matte_bgr,
+        )
         rgba_frame = cv2.cvtColor(cleaned_fg, cv2.COLOR_BGR2RGBA)
         rgba_frame[:, :, 3] = alpha_channel
         rgba_frame[alpha_channel == 0, :3] = 0
@@ -531,6 +695,8 @@ class VideoBackgroundRemover:
         fps: int = 10,
         max_frames: int = None,
         output_size: tuple[int, int] | None = None,
+        remove_background: bool = True,
+        corner_radius: int = 0,
     ):
         """Convert video to animated WebP (like GIF but better quality).
 
@@ -540,6 +706,7 @@ class VideoBackgroundRemover:
             fps: Output FPS (lower = smaller file, default: 10)
             max_frames: Maximum number of frames (optional)
         """
+        self._normalize_corner_radius(corner_radius)
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             raise ValueError(f"Cannot open video: {video_path}")
@@ -567,10 +734,12 @@ class VideoBackgroundRemover:
                     break
 
                 if frame_count % frame_skip == 0:
-                    frame = self._resize_frame(frame, output_size=output_size)
-                    # Remove background
-                    result = self.remove_background_from_frame(frame)
-                    result_pil = Image.fromarray(result)
+                    result_pil = self._to_rgba_image(
+                        frame,
+                        output_size=output_size,
+                        remove_background=remove_background,
+                        corner_radius=corner_radius,
+                    )
                     frames.append(result_pil)
                     result_pil.save(
                         os.path.join(frames_output_dir, f"frame_{len(frames)-1:04d}.png"),
@@ -794,8 +963,11 @@ class VideoBackgroundRemover:
         fps: int = 10,
         max_frames: int = None,
         output_size: tuple[int, int] | None = None,
+        remove_background: bool = True,
+        corner_radius: int = 0,
     ):
         """Convert video to animated GIF with a GIF-specific low-memory pipeline."""
+        self._normalize_corner_radius(corner_radius)
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             raise ValueError(f"Cannot open video: {video_path}")
@@ -825,10 +997,14 @@ class VideoBackgroundRemover:
                     break
 
                 if frame_count % frame_skip == 0:
-                    frame = self._resize_frame(frame, output_size=output_size)
-                    result = self.remove_background_from_frame(frame)
+                    result = self._to_rgba_image(
+                        frame,
+                        output_size=output_size,
+                        remove_background=remove_background,
+                        corner_radius=corner_radius,
+                    )
                     frame_path = os.path.join(frames_output_dir, f"frame_{saved_count:04d}.png")
-                    Image.fromarray(result).save(frame_path, format="PNG")
+                    result.save(frame_path, format="PNG")
                     temp_paths.append(frame_path)
                     saved_count += 1
 
@@ -902,6 +1078,8 @@ class VideoBackgroundRemover:
         max_frames: int = None,
         format: str = "webp",
         output_size: tuple[int, int] | None = None,
+        remove_background: bool = True,
+        corner_radius: int = 0,
     ):
         """Convert video to animated WebP or GIF.
 
@@ -919,9 +1097,12 @@ class VideoBackgroundRemover:
                 fps=fps,
                 max_frames=max_frames,
                 output_size=output_size,
+                remove_background=remove_background,
+                corner_radius=corner_radius,
             )
             return
 
+        self._normalize_corner_radius(corner_radius)
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             raise ValueError(f"Cannot open video: {video_path}")
@@ -949,10 +1130,12 @@ class VideoBackgroundRemover:
                     break
 
                 if frame_count % frame_skip == 0:
-                    frame = self._resize_frame(frame, output_size=output_size)
-                    # Remove background
-                    result = self.remove_background_from_frame(frame)
-                    result_pil = Image.fromarray(result)
+                    result_pil = self._to_rgba_image(
+                        frame,
+                        output_size=output_size,
+                        remove_background=remove_background,
+                        corner_radius=corner_radius,
+                    )
 
                     frames.append(result_pil)
                     result_pil.save(
@@ -1000,8 +1183,10 @@ class VideoBackgroundRemover:
         max_frames: int = None,
         format: str = "webp",
         output_size: tuple[int, int] | None = None,
+        corner_radius: int = 0,
     ) -> None:
         """Convert a MatAnyone foreground+alpha pair into animated WebP or GIF."""
+        self._normalize_corner_radius(corner_radius)
         frames_output_dir = self._prepare_animation_frames_dir(output_path)
         print(f"Saving processed frames to {frames_output_dir}")
         frame_paths, output_fps = self._save_matanyone_rgba_frames(
@@ -1012,7 +1197,10 @@ class VideoBackgroundRemover:
             max_frames=max_frames,
             output_size=output_size,
         )
-        frames = self._load_rgba_frames_as_pil(frame_paths)
+        frames = [
+            self._apply_corner_radius(frame, corner_radius=corner_radius)
+            for frame in self._load_rgba_frames_as_pil(frame_paths)
+        ]
         duration_ms = int(1000 / output_fps)
         format_upper = format.upper()
         print(f"Saving {len(frames)} frames as animated {format_upper}...")
@@ -1045,8 +1233,10 @@ class VideoBackgroundRemover:
         interval_sec: float = 1.0,
         format: str = "webp",
         output_size: tuple[int, int] | None = None,
+        corner_radius: int = 0,
     ) -> list[str]:
         """Extract transparent frames from a MatAnyone pair at a fixed interval."""
+        self._normalize_corner_radius(corner_radius)
         fg_cap = self._open_video_capture(fg_video_path)
         alpha_cap = self._open_video_capture(alpha_video_path)
         os.makedirs(output_dir, exist_ok=True)
@@ -1084,11 +1274,15 @@ class VideoBackgroundRemover:
                             alpha_frame,
                             output_size=output_size,
                         )
+                        rgba_image = self._apply_corner_radius(
+                            Image.fromarray(rgba_frame),
+                            corner_radius=corner_radius,
+                        )
                         output_path = os.path.join(
                             output_dir,
                             f"frame_{saved_count:04d}_t{timestamp:.1f}s.{format}",
                         )
-                        Image.fromarray(rgba_frame).save(output_path, format=format.upper())
+                        rgba_image.save(output_path, format=format.upper())
                         output_paths.append(output_path)
                         saved_count += 1
 
@@ -1240,6 +1434,8 @@ class VideoBackgroundRemover:
         interval_sec: float = 1.0,
         format: str = "webp",
         output_size: tuple[int, int] | None = None,
+        remove_background: bool = True,
+        corner_radius: int = 0,
     ) -> list:
         """Extract frames at specified interval and remove background.
 
@@ -1252,6 +1448,7 @@ class VideoBackgroundRemover:
         Returns:
             List of output frame paths
         """
+        self._normalize_corner_radius(corner_radius)
         os.makedirs(output_dir, exist_ok=True)
 
         cap = cv2.VideoCapture(video_path)
@@ -1281,10 +1478,12 @@ class VideoBackgroundRemover:
                 # Process only at intervals
                 if frame_count % frame_interval == 0:
                     timestamp = frame_count / fps
-                    frame = self._resize_frame(frame, output_size=output_size)
-
-                    # Remove background
-                    result = self.remove_background_from_frame(frame)
+                    result = self._to_rgba_image(
+                        frame,
+                        output_size=output_size,
+                        remove_background=remove_background,
+                        corner_radius=corner_radius,
+                    )
 
                     # Save as webp (supports transparency)
                     output_path = os.path.join(
@@ -1292,8 +1491,7 @@ class VideoBackgroundRemover:
                     )
 
                     # Convert RGBA to PIL and save
-                    result_pil = Image.fromarray(result)
-                    result_pil.save(output_path, format=format.upper())
+                    result.save(output_path, format=format.upper())
 
                     output_paths.append(output_path)
                     saved_count += 1

@@ -2221,6 +2221,12 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                                     info="Limit frames for faster export",
                                     interactive=True,
                                 )
+                                ma2_export_bounce = gr.Checkbox(
+                                    value=False,
+                                    label="Bounce Loop",
+                                    info="Append reversed frames for a ping-pong loop",
+                                    interactive=True,
+                                )
                             with gr.Row():
                                 ma2_export_webp_button = gr.Button(
                                     value="Export WebP", variant="primary", interactive=True

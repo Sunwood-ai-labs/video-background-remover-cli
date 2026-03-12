@@ -201,7 +201,7 @@ def _delegate_to_matanyone_python(args: argparse.Namespace, argv: list[str]) -> 
         env.get("PYTHONPATH"),
         _repo_src_dir(),
     )
-    print("Launching WebUI with MatAnyone Python:", python_executable)
+    print("Launching WebUI with MatAnyone Python:", python_executable, flush=True)
     os.execvpe(str(python_executable), command, env)
     raise RuntimeError("Failed to delegate the WebUI process.")
 
@@ -1446,14 +1446,6 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             f"Results: <code>{results_root}</code></div>"
         )
 
-        if tutorial_single.exists() or tutorial_multi.exists():
-            with gr.Accordion("Tutorial Videos", open=False):
-                with gr.Row():
-                    if tutorial_single.exists():
-                        gr.Video(value=str(tutorial_single), label="Single Target Tutorial")
-                    if tutorial_multi.exists():
-                        gr.Video(value=str(tutorial_multi), label="Multiple Targets Tutorial")
-
         with gr.Tabs():
             build_cli_export_tab(
                 tab_label="rembg",
@@ -1467,6 +1459,13 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             )
 
             with gr.TabItem("MatAnyone"):
+                if tutorial_single.exists() or tutorial_multi.exists():
+                    with gr.Accordion("Tutorial Videos", open=False):
+                        with gr.Row():
+                            if tutorial_single.exists():
+                                gr.Video(value=str(tutorial_single), label="Single Target Tutorial")
+                            if tutorial_multi.exists():
+                                gr.Video(value=str(tutorial_multi), label="Multiple Targets Tutorial")
                 with gr.Tabs():
                     with gr.TabItem("Video"):
                         video_state_default, interactive_state_default = reset_states(args.performance_profile)
@@ -1716,13 +1715,17 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                     )
 
         demo.queue()
-        demo.launch(
-            debug=args.debug,
-            server_name=args.server_name,
-            server_port=args.port,
-            share=args.share,
-            css=css,
-        )
+        try:
+            demo.launch(
+                debug=args.debug,
+                server_name=args.server_name,
+                server_port=args.port,
+                share=args.share,
+                css=css,
+            )
+        except KeyboardInterrupt:
+            # Gradio already closes the server in block_thread(); return cleanly on Ctrl+C.
+            return 0
     return 0
 
 

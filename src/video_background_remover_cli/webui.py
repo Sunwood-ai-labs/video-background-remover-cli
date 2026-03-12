@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import argparse
 from datetime import datetime
 import os
@@ -28,6 +29,19 @@ from .matanyone_bridge import (
 
 DEFAULT_RESULTS_DIR = Path("output") / "webui"
 INTERNAL_LAUNCH_FLAG = "--_internal-launch"
+
+
+def _configure_windows_event_loop_policy() -> None:
+    """Use the selector loop on Windows to avoid noisy Proactor socket-reset logs."""
+    if os.name != "nt":
+        return
+    selector_policy = getattr(asyncio, "WindowsSelectorEventLoopPolicy", None)
+    if selector_policy is None:
+        return
+    current_policy = asyncio.get_event_loop_policy()
+    if isinstance(current_policy, selector_policy):
+        return
+    asyncio.set_event_loop_policy(selector_policy())
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1608,6 +1622,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _configure_windows_event_loop_policy()
     args_list = list(sys.argv[1:] if argv is None else argv)
     parser = build_parser()
     args = parser.parse_args(args_list)

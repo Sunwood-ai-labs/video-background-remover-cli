@@ -11,6 +11,8 @@ if str(SRC) not in sys.path:
 
 from video_background_remover_cli.webui import (
     INTERNAL_LAUNCH_FLAG,
+    _build_cli_output_target,
+    _parse_points_text,
     build_external_launch_command,
     build_pythonpath,
 )
@@ -63,6 +65,31 @@ class PythonPathTests(unittest.TestCase):
         value = build_pythonpath(None, "alpha")
 
         self.assertEqual(value, "alpha")
+
+
+class CliHelperTests(unittest.TestCase):
+    def test_parse_points_text_accepts_newline_and_semicolon(self) -> None:
+        self.assertEqual(
+            _parse_points_text("10,20\n30,40;50,60"),
+            ["10,20", "30,40", "50,60"],
+        )
+
+    def test_parse_points_text_rejects_invalid_value(self) -> None:
+        with self.assertRaises(ValueError):
+            _parse_points_text("10")
+
+    def test_build_cli_output_target_for_pair_webm(self) -> None:
+        target = _build_cli_output_target(
+            Path("output") / "case",
+            "clip_fg.mp4",
+            "matanyone_pair",
+            "video",
+            "webp",
+            "webp",
+            "webm",
+        )
+
+        self.assertEqual(target, str(Path("output") / "case" / "clip_output.webm"))
 
 
 if __name__ == "__main__":

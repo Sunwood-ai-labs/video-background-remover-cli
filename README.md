@@ -60,21 +60,21 @@ uv sync --extra dev
 
 ### Launch the Gradio WebUI
 
-The repository now includes a Gradio app that mirrors the MatAnyone Video/Image workflow and adds post-export helpers for animated `webp`, animated `gif`, zipped transparent frame exports, flattened `mp4`, and transparent `webm`.
+The repository now includes a Gradio 6 WebUI that mirrors the MatAnyone Video/Image workflow, adds a `CLI Export` tab for the current CLI feature set, and provides post-export helpers for animated `webp`, animated `gif`, zipped transparent frame exports, flattened `mp4`, and transparent `webm`.
 
-Recommended launch command when you already have `D:\Prj\MatAnyone` set up:
-
-```powershell
-D:\Prj\MatAnyone\.venv\Scripts\python.exe .\webui.py --port 7860
-```
-
-You can still use `uv` from the repository root if you prefer:
+Recommended `uv` launch command when you already have `D:\Prj\MatAnyone` set up:
 
 ```powershell
 uv run --python D:\Prj\MatAnyone\.venv\Scripts\python.exe -m video_background_remover_cli.webui --port 7860
 ```
 
-If you installed this project as a package, you can also use:
+You can also launch the repository wrapper script through `uv`:
+
+```powershell
+uv run --python D:\Prj\MatAnyone\.venv\Scripts\python.exe .\webui.py --port 7860
+```
+
+If you installed this project as a package, you can use:
 
 ```powershell
 video-background-remover-webui --port 7860
@@ -82,7 +82,8 @@ video-background-remover-webui --port 7860
 
 Notes:
 
-- The WebUI auto-delegates into the MatAnyone Python environment so the original interactive SAM/matting workflow stays available.
+- The WebUI still reuses the MatAnyone runtime environment so the original interactive SAM/matting workflow stays available.
+- The `CLI Export` tab covers the current CLI feature surface for `rembg`, `--backend matanyone`, and `--matanyone` foreground+alpha pair conversion.
 - Image outputs are saved as `png` and `webp`.
 - Video outputs keep the original foreground/alpha pair and can then be exported as `webp`, `gif`, `png` frame ZIPs, `mp4`, or `webm`.
 

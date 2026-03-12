@@ -56,18 +56,18 @@ uv sync --extra dev
 
 ### Gradio WebUI を起動
 
-MatAnyone の Video / Image ワークフローをそのまま使いながら、追加でアニメーション `webp`、アニメーション `gif`、透過フレーム ZIP、`mp4`、透過 `webm` を書き出せる Gradio アプリを同梱しました。
+MatAnyone の Video / Image ワークフローをそのまま使いながら、追加で `CLI Export` タブから現在の CLI 機能も触れる Gradio 6 アプリを同梱しました。アニメーション `webp`、アニメーション `gif`、透過フレーム ZIP、`mp4`、透過 `webm` をまとめて扱えます。
 
-`D:\Prj\MatAnyone` をセットアップ済みなら、次の起動がいちばん確実です。
-
-```powershell
-D:\Prj\MatAnyone\.venv\Scripts\python.exe .\webui.py --port 7860
-```
-
-`uv` で起動したい場合は、リポジトリルートで次も使えます。
+`D:\Prj\MatAnyone` をセットアップ済みなら、`uv` では次の起動が分かりやすいです。
 
 ```powershell
 uv run --python D:\Prj\MatAnyone\.venv\Scripts\python.exe -m video_background_remover_cli.webui --port 7860
+```
+
+ラッパースクリプトを `uv` 経由で起動しても構いません。
+
+```powershell
+uv run --python D:\Prj\MatAnyone\.venv\Scripts\python.exe .\webui.py --port 7860
 ```
 
 パッケージとして入れている場合は、次のコマンドでも起動できます。
@@ -78,7 +78,8 @@ video-background-remover-webui --port 7860
 
 補足:
 
-- WebUI は自動で MatAnyone 側の Python に委譲するので、元アプリのインタラクティブな SAM / matting 操作をそのまま使えます。
+- WebUI は MatAnyone 側の実行環境を再利用するので、元アプリのインタラクティブな SAM / matting 操作をそのまま使えます。
+- `CLI Export` タブでは `rembg`、`--backend matanyone`、`--matanyone` の foreground / alpha ペア変換をまとめて扱えます。
 - 画像出力は `png` と `webp` を保存します。
 - 動画出力は foreground / alpha のペアを保持したうえで、`webp`、`gif`、`png` フレーム ZIP、`mp4`、`webm` に再書き出しできます。
 

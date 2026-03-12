@@ -1248,46 +1248,66 @@ def _launch_in_process(args: argparse.Namespace) -> int:
         fg_video_path: str,
         alpha_video_path: str,
         fps: int = 10,
+        max_frames: int = 150,
         output_size: tuple = None,
     ):
         """Export MatAnyone2 result to animated WebP."""
         if not fg_video_path or not alpha_video_path:
             raise gr.Error("Run Video Matting first to generate output videos.")
 
+        print(f"[WebP Export] Starting export...")
+        print(f"[WebP Export] FG: {fg_video_path}")
+        print(f"[WebP Export] Alpha: {alpha_video_path}")
+        print(f"[WebP Export] FPS: {fps}, Max frames: {max_frames}")
+
         bg_remover = VideoBackgroundRemover()
         output_path = str(Path(fg_video_path).parent / f"{Path(fg_video_path).stem}_animated.webp")
+
+        print(f"[WebP Export] Output: {output_path}")
 
         bg_remover.to_animated_from_mask_pair(
             fg_video_path=fg_video_path,
             alpha_video_path=alpha_video_path,
             output_path=output_path,
             fps=fps,
+            max_frames=max_frames,
             output_size=output_size,
             format="webp",
         )
+        print(f"[WebP Export] Done!")
         return gr.update(value=output_path, visible=True)
 
     def export_to_gif_v2(
         fg_video_path: str,
         alpha_video_path: str,
         fps: int = 10,
+        max_frames: int = 150,
         output_size: tuple = None,
     ):
         """Export MatAnyone2 result to animated GIF."""
         if not fg_video_path or not alpha_video_path:
             raise gr.Error("Run Video Matting first to generate output videos.")
 
+        print(f"[GIF Export] Starting export...")
+        print(f"[GIF Export] FG: {fg_video_path}")
+        print(f"[GIF Export] Alpha: {alpha_video_path}")
+        print(f"[GIF Export] FPS: {fps}, Max frames: {max_frames}")
+
         bg_remover = VideoBackgroundRemover()
         output_path = str(Path(fg_video_path).parent / f"{Path(fg_video_path).stem}_animated.gif")
+
+        print(f"[GIF Export] Output: {output_path}")
 
         bg_remover.to_animated_from_mask_pair(
             fg_video_path=fg_video_path,
             alpha_video_path=alpha_video_path,
             output_path=output_path,
             fps=fps,
+            max_frames=max_frames,
             output_size=output_size,
             format="gif",
         )
+        print(f"[GIF Export] Done!")
         return gr.update(value=output_path, visible=True)
 
     def image_matting_v2(
@@ -2229,6 +2249,15 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                                     info="Lower FPS = smaller file size",
                                     interactive=True,
                                 )
+                                ma2_export_max_frames = gr.Slider(
+                                    minimum=30,
+                                    maximum=300,
+                                    step=10,
+                                    value=150,
+                                    label="Max Frames",
+                                    info="Limit frames for faster export",
+                                    interactive=True,
+                                )
                             with gr.Row():
                                 ma2_export_webp_button = gr.Button(
                                     value="Export WebP", variant="primary", interactive=True
@@ -2323,6 +2352,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                                 ma2_video_foreground_output,
                                 ma2_video_alpha_output,
                                 ma2_export_fps,
+                                ma2_export_max_frames,
                             ],
                             outputs=[ma2_webp_output],
                         )
@@ -2333,6 +2363,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                                 ma2_video_foreground_output,
                                 ma2_video_alpha_output,
                                 ma2_export_fps,
+                                ma2_export_max_frames,
                             ],
                             outputs=[ma2_gif_output],
                         )

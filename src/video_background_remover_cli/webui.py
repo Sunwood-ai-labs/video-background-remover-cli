@@ -1244,6 +1244,52 @@ def _launch_in_process(args: argparse.Namespace) -> int:
         print(f"Saved debug artifacts to {debug_dir}")
         return foreground_output, alpha_output
 
+    def export_to_webp_v2(
+        fg_video_path: str,
+        alpha_video_path: str,
+        fps: int = 10,
+        output_size: tuple = None,
+    ):
+        """Export MatAnyone2 result to animated WebP."""
+        if not fg_video_path or not alpha_video_path:
+            raise gr.Error("Run Video Matting first to generate output videos.")
+
+        bg_remover = VideoBackgroundRemover()
+        output_path = str(Path(fg_video_path).parent / f"{Path(fg_video_path).stem}_animated.webp")
+
+        bg_remover.to_animated_from_mask_pair(
+            fg_video_path=fg_video_path,
+            alpha_video_path=alpha_video_path,
+            output_path=output_path,
+            fps=fps,
+            output_size=output_size,
+            format="webp",
+        )
+        return gr.update(value=output_path, visible=True)
+
+    def export_to_gif_v2(
+        fg_video_path: str,
+        alpha_video_path: str,
+        fps: int = 10,
+        output_size: tuple = None,
+    ):
+        """Export MatAnyone2 result to animated GIF."""
+        if not fg_video_path or not alpha_video_path:
+            raise gr.Error("Run Video Matting first to generate output videos.")
+
+        bg_remover = VideoBackgroundRemover()
+        output_path = str(Path(fg_video_path).parent / f"{Path(fg_video_path).stem}_animated.gif")
+
+        bg_remover.to_animated_from_mask_pair(
+            fg_video_path=fg_video_path,
+            alpha_video_path=alpha_video_path,
+            output_path=output_path,
+            fps=fps,
+            output_size=output_size,
+            format="gif",
+        )
+        return gr.update(value=output_path, visible=True)
+
     def image_matting_v2(
         image_state: dict,
         interactive_state: dict,
@@ -2170,6 +2216,30 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                                         label="Alpha Output", visible=False
                                     )
 
+                            gr.Markdown("---")
+                            gr.Markdown("## Step3: Export to WebP/GIF")
+
+                            with gr.Row():
+                                ma2_export_fps = gr.Slider(
+                                    minimum=5,
+                                    maximum=30,
+                                    step=1,
+                                    value=10,
+                                    label="Export FPS",
+                                    info="Lower FPS = smaller file size",
+                                    interactive=True,
+                                )
+                            with gr.Row():
+                                ma2_export_webp_button = gr.Button(
+                                    value="Export WebP", variant="primary", interactive=True
+                                )
+                                ma2_export_gif_button = gr.Button(
+                                    value="Export GIF", variant="secondary", interactive=True
+                                )
+                            with gr.Row():
+                                ma2_webp_output = gr.File(label="WebP Output", visible=False)
+                                ma2_gif_output = gr.File(label="GIF Output", visible=False)
+
                         # Event handlers for Video tab
                         ma2_load_video_button.click(
                             fn=get_frames_from_video_v2,
@@ -2247,6 +2317,26 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                             outputs=[ma2_video_foreground_output, ma2_video_alpha_output],
                         )
 
+                        ma2_export_webp_button.click(
+                            fn=export_to_webp_v2,
+                            inputs=[
+                                ma2_video_foreground_output,
+                                ma2_video_alpha_output,
+                                ma2_export_fps,
+                            ],
+                            outputs=[ma2_webp_output],
+                        )
+
+                        ma2_export_gif_button.click(
+                            fn=export_to_gif_v2,
+                            inputs=[
+                                ma2_video_foreground_output,
+                                ma2_video_alpha_output,
+                                ma2_export_fps,
+                            ],
+                            outputs=[ma2_gif_output],
+                        )
+
                         ma2_video_mask_dropdown.change(
                             fn=show_mask_v2,
                             inputs=[ma2_video_state, ma2_video_interactive_state, ma2_video_mask_dropdown],
@@ -2316,7 +2406,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                         )
 
                         if video_examples:
-                            gr.Examples(examples=video_examples, inputs=[ma2_image_input])
+                            gr.Examples(examples=video_examples, inputs=[ma2_video_input])
                         ma2_image_interactive_state = gr.State({
                             "inference_times": 0,
                             "negative_click_times": 0,
@@ -2342,6 +2432,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                             "performance_profile": args.performance_profile,
                             "audio": "",
                         })
+                        ma2_image_click_state = gr.State([[], []])
 
                         with gr.Group():
                             with gr.Row():

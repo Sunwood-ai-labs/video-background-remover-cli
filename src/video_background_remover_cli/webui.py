@@ -1,4 +1,4 @@
-"""Gradio WebUI that reuses the MatAnyone interaction flow and adds export tools."""
+"""Gradio WebUI for video-background-remover with integrated MatAnyone workflows."""
 
 from __future__ import annotations
 
@@ -49,8 +49,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="video-background-remover-webui",
         description=(
-            "Launch a Gradio app that preserves the MatAnyone interaction flow "
-            "and adds animated WebP/GIF export helpers."
+            "Launch the video-background-remover Gradio app with integrated "
+            "MatAnyone workflows and animated WebP/GIF export helpers."
         ),
     )
     parser.add_argument(
@@ -365,8 +365,6 @@ def _launch_in_process(args: argparse.Namespace) -> int:
     results_root.mkdir(parents=True, exist_ok=True)
     remover = VideoBackgroundRemover()
 
-    tutorial_single = matanyone_root / "hugging_face" / "assets" / "tutorial_single_target.mp4"
-    tutorial_multi = matanyone_root / "hugging_face" / "assets" / "tutorial_multi_targets.mp4"
     video_examples = [
         matanyone_root / "hugging_face" / "test_sample" / name
         for name in [
@@ -1148,31 +1146,24 @@ def _launch_in_process(args: argparse.Namespace) -> int:
     .vbr-hint {color: #4b5563; font-size: 0.95rem;}
     """
 
-    with gr.Blocks(title="MatAnyone Export Studio") as demo:
+    with gr.Blocks(title="Video Background Remover Studio") as demo:
         gr.HTML(
             """
             <div class="vbr-title">
-              <h1>MatAnyone Export Studio</h1>
+              <h1>Video Background Remover Studio</h1>
             </div>
             """
         )
         gr.Markdown(
-            "MatAnyone の Video / Image ワークフローをそのまま使いながら、"
-            "foreground + alpha の結果を `webp` / `gif` / `png` / `mp4` / `webm` に追加書き出しできます。"
+            "video-background-remover の Gradio アプリとして、MatAnyone の "
+            "Video / Image ワークフローも統合し、foreground + alpha の結果を "
+            "`webp` / `gif` / `png` / `mp4` / `webm` に追加書き出しできます。"
         )
         gr.Markdown(
             f"<div class='vbr-hint'>Device: <code>{device_name}</code> / "
             f"SAM: <code>{sam_model_type}</code> / "
             f"Results: <code>{results_root}</code></div>"
         )
-
-        if tutorial_single.exists() or tutorial_multi.exists():
-            with gr.Accordion("Tutorial Videos", open=False):
-                with gr.Row():
-                    if tutorial_single.exists():
-                        gr.Video(value=str(tutorial_single), label="Single Target Tutorial")
-                    if tutorial_multi.exists():
-                        gr.Video(value=str(tutorial_multi), label="Multiple Targets Tutorial")
 
         with gr.Tabs():
             with gr.TabItem("Video"):

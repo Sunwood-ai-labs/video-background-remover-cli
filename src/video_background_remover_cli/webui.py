@@ -14,13 +14,22 @@ import zipfile
 from PIL import Image
 
 from . import cli as cli_module
+from .background_removal import (
+    build_cli_examples_by_mode,
+    execute_export,
+    parse_color,
+    parse_size,
+    resolve_matanyone_inputs,
+)
+from .background_removal.models import ExportRequest
+from .background_removal.service import ExportServiceContext
 from .bg_remover import VideoBackgroundRemover
-from .cli import parse_color, parse_size, resolve_matanyone_inputs
 from .matanyone_bridge import (
     MATANYONE_DEVICE_CHOICES,
     MATANYONE_MODEL_CHOICES,
     MATANYONE_PROFILE_CHOICES,
     MATANYONE_SAM_MODEL_CHOICES,
+    MatAnyoneRunner,
     resolve_matanyone_python,
     resolve_matanyone_root,
 )
@@ -420,73 +429,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
     ]
     video_examples = [str(path) for path in video_examples if path.exists()]
     image_examples = [str(path) for path in image_examples if path.exists()]
-    cli_examples = [
-        [
-            "regular",
-            None,
-            str(local_star_cat_video),
-            None,
-            "",
-            "",
-            "animated",
-            "mp4",
-            "webp",
-            "webp",
-        ],
-        [
-            "regular",
-            None,
-            str((Path.cwd() / "assets" / "onizuka_walk_motion.mp4").resolve()),
-            None,
-            "",
-            "",
-            "interval",
-            "mp4",
-            "webp",
-            "png",
-        ],
-        [
-            "matanyone_pair",
-            None,
-            str((Path.cwd() / "assets" / "MatAnyone").resolve()),
-            None,
-            "",
-            "",
-            "animated",
-            "webm",
-            "both",
-            "webp",
-        ],
-        [
-            "matanyone_backend",
-            None,
-            str(local_star_cat_video),
-            None,
-            "",
-            "",
-            "video",
-            "mp4",
-            "webp",
-            "webp",
-        ],
-    ]
-    cli_examples_by_mode = {
-        "regular": [
-            [example[1], example[2], example[5], example[6], example[7], example[8], example[9]]
-            for example in cli_examples
-            if example[0] == "regular"
-        ],
-        "matanyone_backend": [
-            [example[1], example[2], example[5], example[6], example[7], example[8], example[9]]
-            for example in cli_examples
-            if example[0] == "matanyone_backend"
-        ],
-        "matanyone_pair": [
-            [example[1], example[2], example[3], example[4], example[5], example[6], example[7], example[8], example[9]]
-            for example in cli_examples
-            if example[0] == "matanyone_pair"
-        ],
-    }
+    cli_examples_by_mode = build_cli_examples_by_mode(Path.cwd())
 
     def load_runtime_model(display_name: str):
         return runtime_models.load_model(display_name)
@@ -1488,16 +1431,16 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             input_path_for_output = input_path
         regular_backend = "matanyone" if source_mode == "matanyone_backend" else "rembg"
 
-        args_namespace = argparse.Namespace(
-            input=input_path if source_mode != "matanyone_pair" else input_path_for_output,
-            output=output_path_value,
-            model=rembg_model,
-            backend=regular_backend if source_mode != "matanyone_pair" else "rembg",
-            matanyone=(source_mode == "matanyone_pair"),
-            alpha_video=resolved_alpha if source_mode == "matanyone_pair" else None,
+        request = ExportRequest(
+            input_path=input_path if source_mode != "matanyone_pair" else input_path_for_output,
+            output_path=output_path_value,
+            model_name=rembg_model,
+            backend_name=regular_backend if source_mode != "matanyone_pair" else "rembg",
+            use_matanyone_pair=(source_mode == "matanyone_pair"),
+            alpha_video_path=resolved_alpha if source_mode == "matanyone_pair" else None,
             matanyone_root=(matanyone_root_text or "").strip() or None,
             matanyone_python=(matanyone_python_text or "").strip() or None,
-            matanyone_model=matanyone_model_name,
+            matanyone_model_name=matanyone_model_name,
             matanyone_device=matanyone_device_name,
             matanyone_performance_profile=matanyone_profile_name,
             matanyone_sam_model_type=matanyone_sam_name,
@@ -1507,39 +1450,46 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             matanyone_output_fps=float(matanyone_output_fps) if matanyone_output_fps not in (None, "") else None,
             matanyone_select_frame=int(matanyone_select_frame or 0),
             matanyone_end_frame=int(matanyone_end_frame) if matanyone_end_frame not in (None, "") else None,
-            positive_point=positive_points,
-            negative_point=negative_points,
+            positive_points=positive_points,
+            negative_points=negative_points,
             fps=int(regular_fps) if regular_fps not in (None, "", 0) else None,
-            bg_color=None if bg_color is None else ",".join(str(value) for value in bg_color),
-            bg_image=background_image_path,
-            size=f"{output_size[0]}x{output_size[1]}" if output_size else None,
+            bg_color_text=None if bg_color is None else ",".join(str(value) for value in bg_color),
+            bg_image_path=background_image_path,
+            size_text=f"{output_size[0]}x{output_size[1]}" if output_size else None,
             keep_frames=bool(keep_frames),
             work_dir=(work_dir_text or "").strip() or None,
-            interval=_safe_interval_seconds(interval_seconds) if export_mode == "interval" else None,
-            format=frame_format if export_mode == "interval" else "mp4",
-            animated=animated_format if export_mode == "animated" else None,
-            webp_fps=max(1, int(animated_fps or 10)),
+            interval_seconds=_safe_interval_seconds(interval_seconds) if export_mode == "interval" else None,
+            output_format=frame_format if export_mode == "interval" else "mp4",
+            animated_format=animated_format if export_mode == "animated" else None,
+            animated_fps=max(1, int(animated_fps or 10)),
             max_frames=_safe_max_frames(max_frames),
             no_bg_removal=bool(no_bg_removal),
             corner_radius=max(0, int(corner_radius)),
         )
 
         if export_mode == "video" and source_mode == "matanyone_pair" and video_format == "webm":
-            args_namespace.output = output_path_value
+            request.output_path = output_path_value
         elif export_mode == "video" and video_format == "webm":
             raise gr.Error("Regular video export to .webm is only supported for MatAnyone foreground+alpha pairs.")
 
         if export_mode == "interval":
-            args_namespace.format = frame_format
+            request.output_format = frame_format
         elif export_mode == "animated":
-            args_namespace.format = (
+            request.output_format = (
                 animated_format if animated_format in {"webp", "gif"} else "webp"
             )
         else:
-            args_namespace.format = video_format
+            request.output_format = video_format
+
+        context = ExportServiceContext(
+            remover_factory=VideoBackgroundRemover,
+            matanyone_runner_factory=MatAnyoneRunner,
+            resolve_matanyone_root=resolve_matanyone_root,
+            resolve_matanyone_python=resolve_matanyone_python,
+        )
 
         try:
-            cli_module.run(args_namespace)
+            execute_export(request, context=context)
         except Exception as exc:
             return (
                 gr.update(value=""),
@@ -1547,7 +1497,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             )
 
         collected_paths: list[str] = []
-        output_path = Path(args_namespace.output)
+        output_path = Path(request.output_path)
         if export_mode == "animated":
             output_root = output_path.with_suffix("")
             formats = ["webp", "gif"] if animated_format == "both" else [animated_format]
@@ -1555,7 +1505,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                 str(output_root.with_suffix(f".{fmt}")) for fmt in formats
             )
         elif export_mode == "interval":
-            frame_dir = Path(f"{args_namespace.output}_{frame_format}")
+            frame_dir = Path(f"{request.output_path}_{frame_format}")
             if frame_dir.exists():
                 collected_paths.append(_zip_paths([frame_dir], frame_dir.with_suffix(".zip")))
         else:
@@ -1563,9 +1513,9 @@ def _launch_in_process(args: argparse.Namespace) -> int:
 
         status_lines = [
             f"Source mode: {source_mode}",
-            f"Backend: {args_namespace.backend}",
+            f"Backend: {request.backend_name}",
             f"Export mode: {export_mode}",
-            f"Saved target: {args_namespace.output}",
+            f"Saved target: {request.output_path}",
         ]
         return (
             gr.update(value="\n".join(_collect_existing_files(collected_paths))),

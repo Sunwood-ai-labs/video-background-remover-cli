@@ -16,6 +16,10 @@ from video_background_remover_cli.webui import (
     build_external_launch_command,
     build_pythonpath,
 )
+from video_background_remover_cli.background_removal.examples import (
+    build_cli_example_cases,
+    build_cli_examples_by_mode,
+)
 
 
 class WebUiCommandTests(unittest.TestCase):
@@ -90,6 +94,22 @@ class CliHelperTests(unittest.TestCase):
         )
 
         self.assertEqual(target, str(Path("output") / "case" / "clip_output.webm"))
+
+
+class WebUiExampleTests(unittest.TestCase):
+    def test_cli_example_cases_point_to_repo_assets(self) -> None:
+        examples = build_cli_example_cases(ROOT)
+
+        self.assertTrue(examples)
+        for example in examples:
+            self.assertTrue(Path(example.manual_input_path).exists(), example.manual_input_path)
+
+    def test_cli_examples_by_mode_match_ui_shapes(self) -> None:
+        examples_by_mode = build_cli_examples_by_mode(ROOT)
+
+        self.assertEqual(len(examples_by_mode["regular"][0]), 7)
+        self.assertEqual(len(examples_by_mode["matanyone_backend"][0]), 7)
+        self.assertEqual(len(examples_by_mode["matanyone_pair"][0]), 9)
 
 
 if __name__ == "__main__":

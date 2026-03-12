@@ -1085,10 +1085,22 @@ def _launch_in_process(args: argparse.Namespace) -> int:
         elif export_mode == "video" and video_format == "webm":
             raise gr.Error("Regular video export to .webm is only supported for MatAnyone foreground+alpha pairs.")
 
+        if export_mode == "interval":
+            args_namespace.format = frame_format
+        elif export_mode == "animated":
+            args_namespace.format = (
+                animated_format if animated_format in {"webp", "gif"} else "webp"
+            )
+        else:
+            args_namespace.format = video_format
+
         try:
             cli_module.run(args_namespace)
         except Exception as exc:
-            raise gr.Error(str(exc)) from exc
+            return (
+                gr.update(value=""),
+                gr.update(value=f"Error: {exc}"),
+            )
 
         collected_paths: list[str] = []
         output_path = Path(args_namespace.output)
@@ -1112,7 +1124,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             f"Saved target: {args_namespace.output}",
         ]
         return (
-            gr.update(value=_collect_existing_files(collected_paths), visible=True),
+            gr.update(value="\n".join(_collect_existing_files(collected_paths))),
             gr.update(value="\n".join(status_lines)),
         )
 
@@ -1517,7 +1529,11 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                         )
 
                 cli_run_button = gr.Button("Run CLI Export")
-                cli_export_files = gr.File(label="CLI Export Outputs", file_count="multiple", visible=False)
+                cli_export_files = gr.Textbox(
+                    label="CLI Export Outputs",
+                    lines=6,
+                    interactive=False,
+                )
                 cli_export_status = gr.Textbox(label="CLI Export Status", lines=6)
 
                 cli_run_button.click(

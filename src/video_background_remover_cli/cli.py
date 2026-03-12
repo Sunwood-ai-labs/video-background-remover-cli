@@ -537,6 +537,7 @@ def _run_matanyone_pair_pipeline(
                 format=fmt,
                 output_size=output_size,
                 corner_radius=args.corner_radius,
+                bounce=args.bounce,
             )
         return 0
 

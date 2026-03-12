@@ -2437,6 +2437,10 @@ def _launch_in_process(args: argparse.Namespace) -> int:
 
                         if video_examples:
                             gr.Examples(examples=video_examples, inputs=[ma2_video_input])
+
+                    # Image Tab
+                    with gr.TabItem("Image"):
+                        ma2_image_click_state = gr.State([[], []])
                         ma2_image_interactive_state = gr.State({
                             "inference_times": 0,
                             "negative_click_times": 0,
@@ -2462,7 +2466,6 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                             "performance_profile": args.performance_profile,
                             "audio": "",
                         })
-                        ma2_image_click_state = gr.State([[], []])
 
                         with gr.Group():
                             with gr.Row():

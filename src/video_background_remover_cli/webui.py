@@ -7,7 +7,6 @@ import argparse
 from datetime import datetime
 import os
 from pathlib import Path
-import subprocess
 import sys
 from typing import Any
 import zipfile
@@ -42,6 +41,34 @@ def _configure_windows_event_loop_policy() -> None:
     if isinstance(current_policy, selector_policy):
         return
     asyncio.set_event_loop_policy(selector_policy())
+
+
+def _suppress_windows_connection_reset_noise() -> None:
+    """Ignore benign WinError 10054 transport shutdown noise on Windows."""
+    if os.name != "nt":
+        return
+    try:
+        from asyncio import proactor_events
+    except ImportError:
+        return
+
+    transport_class = getattr(proactor_events, "_ProactorBasePipeTransport", None)
+    if transport_class is None:
+        return
+    original = getattr(transport_class, "_call_connection_lost", None)
+    if original is None or getattr(original, "_vbr_patched", False):
+        return
+
+    def patched_call_connection_lost(self: Any, exc: BaseException | None) -> None:
+        try:
+            original(self, exc)
+        except (ConnectionResetError, OSError) as error:
+            if getattr(error, "winerror", None) == 10054:
+                return
+            raise
+
+    setattr(patched_call_connection_lost, "_vbr_patched", True)
+    transport_class._call_connection_lost = patched_call_connection_lost
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -175,8 +202,8 @@ def _delegate_to_matanyone_python(args: argparse.Namespace, argv: list[str]) -> 
         _repo_src_dir(),
     )
     print("Launching WebUI with MatAnyone Python:", python_executable)
-    completed = subprocess.run(command, env=env)
-    return completed.returncode
+    os.execvpe(str(python_executable), command, env)
+    raise RuntimeError("Failed to delegate the WebUI process.")
 
 
 def _ensure_import_path(path: Path) -> None:
@@ -365,6 +392,8 @@ def _launch_in_process(args: argparse.Namespace) -> int:
     results_root.mkdir(parents=True, exist_ok=True)
     remover = VideoBackgroundRemover()
 
+    tutorial_single = matanyone_root / "hugging_face" / "assets" / "tutorial_single_target.mp4"
+    tutorial_multi = matanyone_root / "hugging_face" / "assets" / "tutorial_multi_targets.mp4"
     video_examples = [
         matanyone_root / "hugging_face" / "test_sample" / name
         for name in [
@@ -1165,6 +1194,14 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             f"Results: <code>{results_root}</code></div>"
         )
 
+        if tutorial_single.exists() or tutorial_multi.exists():
+            with gr.Accordion("Tutorial Videos", open=False):
+                with gr.Row():
+                    if tutorial_single.exists():
+                        gr.Video(value=str(tutorial_single), label="Single Target Tutorial")
+                    if tutorial_multi.exists():
+                        gr.Video(value=str(tutorial_multi), label="Multiple Targets Tutorial")
+
         with gr.Tabs():
             with gr.TabItem("Video"):
                 video_state_default, interactive_state_default = reset_states(args.performance_profile)
@@ -1614,6 +1651,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     _configure_windows_event_loop_policy()
+    _suppress_windows_connection_reset_noise()
     args_list = list(sys.argv[1:] if argv is None else argv)
     parser = build_parser()
     args = parser.parse_args(args_list)

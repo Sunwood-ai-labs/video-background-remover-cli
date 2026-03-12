@@ -357,6 +357,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
         create_empty_media_state,
         create_run_output_dir,
         export_debug_artifacts,
+        generate_video_from_frames,
         load_image_state,
         load_video_state,
         prepare_sam_frame,
@@ -394,6 +395,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
 
     tutorial_single = matanyone_root / "hugging_face" / "assets" / "tutorial_single_target.mp4"
     tutorial_multi = matanyone_root / "hugging_face" / "assets" / "tutorial_multi_targets.mp4"
+    local_star_cat_video = (Path.cwd() / "assets" / "star-cat2.mp4").resolve()
     video_examples = [
         matanyone_root / "hugging_face" / "test_sample" / name
         for name in [
@@ -405,6 +407,8 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             "test-sample-5-720p.mp4",
         ]
     ]
+    if local_star_cat_video.exists():
+        video_examples.insert(0, local_star_cat_video)
     image_examples = [
         matanyone_root / "hugging_face" / "test_sample" / name
         for name in [
@@ -420,7 +424,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
         [
             "regular",
             None,
-            str((Path.cwd() / "assets" / "onizuka_idle_motion.mp4").resolve()),
+            str(local_star_cat_video),
             None,
             "",
             "",
@@ -456,7 +460,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
         [
             "matanyone_backend",
             None,
-            str((Path.cwd() / "assets" / "onizuka_idle_motion.mp4").resolve()),
+            str(local_star_cat_video),
             None,
             "",
             "",
@@ -591,7 +595,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             gr.update(
                 value=(
                     "Video loaded. Click the frame to add positive or negative points, "
-                    "then press Add Mask."
+                    "then press Add Mask. Mask Selection will fill after you add a mask."
                 )
             ),
             gr.update(value=""),
@@ -624,7 +628,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             gr.update(value=None, visible=False),
             gr.update(value=None, visible=False),
             gr.update(value=[], visible=False),
-            gr.update(value="Image loaded. Click to assign points, then press Add Mask."),
+            gr.update(value="Image loaded. Click to assign points, then press Add Mask. Mask Selection will fill after you add a mask."),
         )
 
     def select_media_frame(
@@ -1020,6 +1024,326 @@ def _launch_in_process(args: argparse.Namespace) -> int:
 
         status = f"Export complete: {export_mode}\nSaved under {export_dir}"
         return gr.update(value=_collect_existing_files(exported_paths), visible=True), gr.update(value=status)
+
+    # ========== MatAnyone2 Tab Functions (from MatAnyone app.py) ==========
+
+    def get_frames_from_video_v2(video_input: str, video_state: dict, performance_profile: str):
+        """Extract frames from uploaded video - MatAnyone2 version."""
+        video_state, video_info, _runtime_profile = load_video_state(
+            video_input, device_name, performance_profile
+        )
+        prepare_sam_frame(sam_generator, video_state, 0, force=True)
+        frame_count = len(video_state["origin_images"])
+        return (
+            video_state,
+            video_info,
+            video_state["origin_images"][0],
+            gr.update(visible=True, maximum=frame_count, value=1),
+            gr.update(visible=False, maximum=frame_count, value=frame_count),
+            gr.update(visible=True),
+            gr.update(visible=True),
+            gr.update(visible=True),
+            gr.update(visible=True),
+            gr.update(visible=True),
+            gr.update(visible=True),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=True),
+            gr.update(visible=True),
+        )
+
+    def get_frames_from_image_v2(image_input: np.ndarray, image_state: dict, performance_profile: str):
+        """Extract frames from uploaded image - MatAnyone2 version."""
+        image_state, image_info, _runtime_profile = load_image_state(
+            image_input, device_name, performance_profile
+        )
+        prepare_sam_frame(sam_generator, image_state, 0, force=True)
+        frame_count = len(image_state["origin_images"])
+        return (
+            image_state,
+            image_info,
+            image_state["origin_images"][0],
+            gr.update(visible=True, maximum=10, value=10),
+            gr.update(visible=False, maximum=frame_count, value=frame_count),
+            gr.update(visible=True),
+            gr.update(visible=True),
+            gr.update(visible=True),
+            gr.update(visible=True),
+            gr.update(visible=True),
+            gr.update(visible=True),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=True),
+            gr.update(visible=True),
+        )
+
+    def select_video_template_v2(slider_value: int, video_state: dict, interactive_state: dict):
+        """Select frame from video slider - MatAnyone2 version."""
+        selected_index = max(0, int(slider_value) - 1)
+        video_state["select_frame_number"] = selected_index
+        prepare_sam_frame(sam_generator, video_state, selected_index, force=True)
+        return video_state["painted_images"][selected_index], video_state, interactive_state
+
+    def select_image_template_v2(refine_iter: int, image_state: dict, interactive_state: dict):
+        """Select template for image - MatAnyone2 version."""
+        image_state["select_frame_number"] = 0
+        prepare_sam_frame(sam_generator, image_state, 0, force=True)
+        return image_state["painted_images"][0], image_state, interactive_state
+
+    def get_end_number_v2(slider_value: int, video_state: dict, interactive_state: dict):
+        """Set tracking end frame - MatAnyone2 version."""
+        interactive_state["track_end_number"] = slider_value
+        return video_state["painted_images"][slider_value], interactive_state
+
+    def sam_refine_v2(video_state: dict, point_prompt: str, click_state: list, interactive_state: dict, evt: gr.SelectData):
+        """Use SAM to get mask - MatAnyone2 version."""
+        if point_prompt == "Positive":
+            coordinate = "[[{},{},1]]".format(evt.index[0], evt.index[1])
+            interactive_state["positive_click_times"] += 1
+        else:
+            coordinate = "[[{},{},0]]".format(evt.index[0], evt.index[1])
+            interactive_state["negative_click_times"] += 1
+
+        selected_frame = video_state["select_frame_number"]
+        import json
+        inputs = json.loads(coordinate)
+        points = click_state[0]
+        labels = click_state[1]
+        for inp in inputs:
+            points.append(inp[:2])
+            labels.append(inp[2])
+        click_state[0] = points
+        click_state[1] = labels
+
+        mask, logit, painted_image = apply_sam_points(
+            sam_generator,
+            video_state,
+            points,
+            labels,
+            frame_index=selected_frame,
+            multimask="True",
+        )
+        video_state["masks"][selected_frame] = mask
+        video_state["logits"][selected_frame] = logit
+        video_state["painted_images"][selected_frame] = painted_image
+        return painted_image, video_state, interactive_state
+
+    def add_multi_mask_v2(video_state: dict, interactive_state: dict, mask_dropdown: list):
+        """Add mask to multi-mask list - MatAnyone2 version."""
+        mask = video_state["masks"][video_state["select_frame_number"]]
+        interactive_state["multi_mask"]["masks"].append(mask)
+        interactive_state["multi_mask"]["mask_names"].append(
+            "mask_{:03d}".format(len(interactive_state["multi_mask"]["masks"]))
+        )
+        mask_dropdown.append("mask_{:03d}".format(len(interactive_state["multi_mask"]["masks"])))
+        select_frame = show_mask_v2(video_state, interactive_state, mask_dropdown)
+        return (
+            interactive_state,
+            gr.update(choices=interactive_state["multi_mask"]["mask_names"], value=mask_dropdown),
+            select_frame,
+            [[], []],
+        )
+
+    def clear_click_v2(video_state: dict, click_state: list):
+        """Clear click state - MatAnyone2 version."""
+        click_state = [[], []]
+        template_frame = video_state["origin_images"][video_state["select_frame_number"]]
+        return template_frame, click_state
+
+    def remove_multi_mask_v2(interactive_state: dict, mask_dropdown: list):
+        """Remove all masks - MatAnyone2 version."""
+        interactive_state["multi_mask"]["mask_names"] = []
+        interactive_state["multi_mask"]["masks"] = []
+        return interactive_state, gr.update(choices=[], value=[])
+
+    def show_mask_v2(video_state: dict, interactive_state: dict, mask_dropdown: list):
+        """Show selected masks - MatAnyone2 version."""
+        mask_dropdown.sort()
+        if video_state["origin_images"]:
+            select_frame = video_state["origin_images"][video_state["select_frame_number"]]
+            for i in range(len(mask_dropdown)):
+                mask_number = int(mask_dropdown[i].split("_")[1]) - 1
+                mask = interactive_state["multi_mask"]["masks"][mask_number]
+                select_frame = mask_painter(select_frame, mask.astype("uint8"), mask_color=mask_number + 2)
+            return select_frame
+        return None
+
+    def video_matting_v2(
+        video_state: dict,
+        interactive_state: dict,
+        mask_dropdown: list,
+        erode_kernel_size: int,
+        dilate_kernel_size: int,
+        model_selection: str,
+        performance_profile: str,
+    ):
+        """Video matting - MatAnyone2 version using generate_video_from_frames."""
+        if not video_state.get("origin_images"):
+            raise gr.Error("Load a video first.")
+
+        sam_generator.release()
+        try:
+            selected_model = load_runtime_model(model_selection)
+        except (FileNotFoundError, ValueError) as e:
+            if available_models:
+                print(f"Warning: {str(e)}. Using {available_models[0]} instead.")
+                selected_model = load_runtime_model(available_models[0])
+            else:
+                raise ValueError("No models are available! Please check if the model files exist.")
+
+        template_mask = compose_selected_mask(
+            video_state["masks"][video_state["select_frame_number"]],
+            interactive_state["multi_mask"]["masks"],
+            mask_dropdown,
+        )
+        if interactive_state["multi_mask"]["masks"]:
+            video_state["masks"][video_state["select_frame_number"]] = template_mask
+
+        fps = video_state["fps"]
+        audio_path = video_state.get("audio", "")
+
+        foreground, alpha, _runtime_profile = run_matting(
+            selected_model,
+            video_state,
+            template_mask,
+            performance_profile,
+            device_name,
+            erode_kernel_size=erode_kernel_size,
+            dilate_kernel_size=dilate_kernel_size,
+        )
+
+        target_size = video_state.get("source_size")
+        run_output_dir = create_run_output_dir(str(results_root / "matanyone2_video"), video_state)
+        video_name = video_state.get("video_name") or "output"
+
+        foreground_output = generate_video_from_frames(
+            foreground,
+            output_path=str(Path(run_output_dir) / f"{video_name}_fg.mp4"),
+            fps=fps,
+            audio_path=audio_path,
+            target_size=target_size,
+        )
+        alpha_output = generate_video_from_frames(
+            alpha,
+            output_path=str(Path(run_output_dir) / f"{video_name}_alpha.mp4"),
+            fps=fps,
+            gray2rgb=True,
+            audio_path=audio_path,
+            target_size=target_size,
+        )
+        debug_dir = export_debug_artifacts(
+            run_output_dir,
+            video_state,
+            template_mask,
+            foreground,
+            alpha,
+            device_name=device_name,
+            performance_profile=performance_profile,
+            model_name=model_selection,
+        )
+        print(f"Saved debug artifacts to {debug_dir}")
+        return foreground_output, alpha_output
+
+    def image_matting_v2(
+        image_state: dict,
+        interactive_state: dict,
+        mask_dropdown: list,
+        erode_kernel_size: int,
+        dilate_kernel_size: int,
+        refine_iter: int,
+        model_selection: str,
+        performance_profile: str,
+    ):
+        """Image matting - MatAnyone2 version."""
+        if not image_state.get("origin_images"):
+            raise gr.Error("Load an image first.")
+
+        sam_generator.release()
+        try:
+            selected_model = load_runtime_model(model_selection)
+        except (FileNotFoundError, ValueError) as e:
+            if available_models:
+                print(f"Warning: {str(e)}. Using {available_models[0]} instead.")
+                selected_model = load_runtime_model(available_models[0])
+            else:
+                raise ValueError("No models are available! Please check if the model files exist.")
+
+        template_mask = compose_selected_mask(
+            image_state["masks"][image_state["select_frame_number"]],
+            interactive_state["multi_mask"]["masks"],
+            mask_dropdown,
+        )
+        if interactive_state["multi_mask"]["masks"]:
+            image_state["masks"][image_state["select_frame_number"]] = template_mask
+
+        foreground, alpha, _runtime_profile = run_matting(
+            selected_model,
+            image_state,
+            template_mask,
+            performance_profile,
+            device_name,
+            erode_kernel_size=erode_kernel_size,
+            dilate_kernel_size=dilate_kernel_size,
+            refine_iter=refine_iter,
+        )
+
+        target_size = image_state.get("source_size")
+        foreground_frame = resize_output_frame(foreground[-1], target_size, interpolation=cv2.INTER_LINEAR)
+        alpha_frame = resize_output_frame(alpha[-1], target_size, interpolation=cv2.INTER_LINEAR)
+        foreground_output = Image.fromarray(foreground_frame)
+        alpha_output = Image.fromarray(alpha_frame[:, :, 0])
+
+        run_output_dir = create_run_output_dir(str(results_root / "matanyone2_image"), image_state)
+        save_cli_outputs(
+            run_output_dir,
+            image_state.get("image_name") or "output.png",
+            target_size,
+            template_mask.astype("uint8"),
+            image_state["painted_images"][image_state["select_frame_number"]],
+            foreground,
+            alpha,
+            False,
+        )
+        debug_dir = export_debug_artifacts(
+            run_output_dir,
+            image_state,
+            template_mask,
+            foreground,
+            alpha,
+            device_name=device_name,
+            performance_profile=performance_profile,
+            model_name=model_selection,
+        )
+        print(f"Saved debug artifacts to {debug_dir}")
+        return foreground_output, alpha_output
+
+    def restart_v2():
+        """Reset all states for new input - MatAnyone2 version."""
+        media_state, interactive_state = create_empty_media_state(args.performance_profile, False)
+        return (
+            media_state,
+            interactive_state,
+            [[], []],
+            None,
+            None,
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False, choices=[], value=[]),
+            "",
+            gr.update(visible=False),
+        )
+
+    # ========== End MatAnyone2 Tab Functions ==========
 
     def run_cli_export(
         source_mode: str,
@@ -1478,7 +1802,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                             video_model_selection = gr.Radio(choices=available_models, value=default_model, label="Model Selection")
                             video_profile = gr.Radio(choices=PROFILE_CHOICES, value=args.performance_profile, label="Performance Profile")
 
-                        with gr.Accordion("Matting Settings", open=False):
+                        with gr.Accordion("Matting Settings", open=True):
                             with gr.Row():
                                 video_erode = gr.Slider(label="Erode Kernel Size", minimum=0, maximum=30, step=1, value=10)
                                 video_dilate = gr.Slider(label="Dilate Kernel Size", minimum=0, maximum=30, step=1, value=10)
@@ -1487,7 +1811,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                                 video_end_frame = gr.Slider(minimum=1, maximum=100, step=1, value=1, label="Track End Frame", visible=False)
                             with gr.Row():
                                 video_point_prompt = gr.Radio(choices=["Positive", "Negative"], value="Positive", label="Point Prompt", visible=False)
-                                video_mask_dropdown = gr.Dropdown(multiselect=True, value=[], label="Mask Selection", visible=False)
+                                video_mask_dropdown = gr.Dropdown(multiselect=True, value=[], label="Mask Selection (after Add Mask)", visible=False)
 
                         with gr.Row():
                             with gr.Column(scale=2):
@@ -1613,7 +1937,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                             image_model_selection = gr.Radio(choices=available_models, value=default_model, label="Model Selection")
                             image_profile = gr.Radio(choices=PROFILE_CHOICES, value=args.performance_profile, label="Performance Profile")
 
-                        with gr.Accordion("Matting Settings", open=False):
+                        with gr.Accordion("Matting Settings", open=True):
                             with gr.Row():
                                 image_erode = gr.Slider(label="Erode Kernel Size", minimum=0, maximum=30, step=1, value=10)
                                 image_dilate = gr.Slider(label="Dilate Kernel Size", minimum=0, maximum=30, step=1, value=10)
@@ -1622,7 +1946,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                                 image_track_end = gr.Slider(minimum=1, maximum=1, step=1, value=1, label="Track End Frame", visible=False)
                             with gr.Row():
                                 image_point_prompt = gr.Radio(choices=["Positive", "Negative"], value="Positive", label="Point Prompt", visible=False)
-                                image_mask_dropdown = gr.Dropdown(multiselect=True, value=[], label="Mask Selection", visible=False)
+                                image_mask_dropdown = gr.Dropdown(multiselect=True, value=[], label="Mask Selection (after Add Mask)", visible=False)
 
                         with gr.Row():
                             with gr.Column(scale=2):
@@ -1690,6 +2014,599 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                         )
                         if image_examples:
                             gr.Examples(examples=image_examples, inputs=[image_input])
+
+            # ========== MatAnyone2 Tab (Pure MatAnyone app.py implementation) ==========
+            with gr.TabItem("MatAnyone2"):
+                gr.Markdown("### Pure MatAnyone2 Interface (from MatAnyone app.py)")
+                gr.Markdown("This tab uses the original MatAnyone implementation with `generate_video_from_frames`.")
+
+                with gr.Tabs():
+                    # Video Tab
+                    with gr.TabItem("Video"):
+                        ma2_video_click_state = gr.State([[], []])
+                        ma2_video_interactive_state = gr.State({
+                            "inference_times": 0,
+                            "negative_click_times": 0,
+                            "positive_click_times": 0,
+                            "mask_save": False,
+                            "multi_mask": {"mask_names": [], "masks": []},
+                            "track_end_number": None,
+                        })
+                        ma2_video_state = gr.State({
+                            "user_name": "",
+                            "video_name": "",
+                            "origin_images": None,
+                            "painted_images": None,
+                            "masks": None,
+                            "inpaint_masks": None,
+                            "logits": None,
+                            "select_frame_number": 0,
+                            "fps": 30,
+                            "audio": "",
+                            "source_fps": 30,
+                            "frame_stride": 1,
+                            "source_size": None,
+                            "working_size": None,
+                            "performance_profile": args.performance_profile,
+                        })
+
+                        with gr.Group():
+                            with gr.Row():
+                                ma2_video_model_selection = gr.Radio(
+                                    choices=available_models,
+                                    value=default_model,
+                                    label="Model Selection",
+                                    info="Choose the model to use for matting",
+                                    interactive=True,
+                                )
+                                ma2_video_performance_profile = gr.Radio(
+                                    choices=PROFILE_CHOICES,
+                                    value=args.performance_profile,
+                                    label="Performance Profile",
+                                    info="CPU auto uses fast. Faster profiles reduce working FPS and resolution.",
+                                    interactive=True,
+                                )
+                            with gr.Accordion("Matting Settings", open=False):
+                                with gr.Row():
+                                    ma2_video_erode = gr.Slider(
+                                        label="Erode Kernel Size",
+                                        minimum=0,
+                                        maximum=30,
+                                        step=1,
+                                        value=10,
+                                        info="Erosion on the added mask",
+                                        interactive=True,
+                                    )
+                                    ma2_video_dilate = gr.Slider(
+                                        label="Dilate Kernel Size",
+                                        minimum=0,
+                                        maximum=30,
+                                        step=1,
+                                        value=10,
+                                        info="Dilation on the added mask",
+                                        interactive=True,
+                                    )
+                                with gr.Row():
+                                    ma2_video_start_frame = gr.Slider(
+                                        minimum=1,
+                                        maximum=100,
+                                        step=1,
+                                        value=1,
+                                        label="Start Frame",
+                                        info="Choose the start frame for target assignment",
+                                        visible=False,
+                                    )
+                                    ma2_video_end_frame = gr.Slider(
+                                        minimum=1,
+                                        maximum=100,
+                                        step=1,
+                                        value=1,
+                                        label="Track End Frame",
+                                        visible=False,
+                                    )
+                                with gr.Row():
+                                    ma2_video_point_prompt = gr.Radio(
+                                        choices=["Positive", "Negative"],
+                                        value="Positive",
+                                        label="Point Prompt",
+                                        info="Click to add positive or negative point",
+                                        interactive=True,
+                                        visible=False,
+                                    )
+                                    ma2_video_mask_dropdown = gr.Dropdown(
+                                        multiselect=True,
+                                        value=[],
+                                        label="Mask Selection",
+                                        info="Choose 1~all mask(s) added",
+                                        visible=False,
+                                    )
+
+                        gr.Markdown("---")
+
+                        with gr.Column():
+                            with gr.Row():
+                                with gr.Column(scale=2):
+                                    gr.Markdown("## Step1: Upload video")
+                                with gr.Column(scale=2):
+                                    ma2_video_step2_title = gr.Markdown(
+                                        "## Step2: Add masks <small>(Click then **Add Mask**)</small>",
+                                        visible=False,
+                                    )
+                            with gr.Row():
+                                with gr.Column(scale=2):
+                                    ma2_video_input = gr.Video(label="Input Video")
+                                    ma2_load_video_button = gr.Button(value="Load Video", interactive=True)
+                                with gr.Column(scale=2):
+                                    ma2_video_info = gr.Textbox(label="Video Info", visible=False)
+                                    ma2_video_template_frame = gr.Image(
+                                        type="pil",
+                                        label="Interactive Frame",
+                                        interactive=True,
+                                        visible=False,
+                                    )
+                                    with gr.Row():
+                                        ma2_video_clear_button = gr.Button(
+                                            value="Clear Clicks", interactive=True, visible=False
+                                        )
+                                        ma2_video_add_mask_button = gr.Button(
+                                            value="Add Mask", interactive=True, visible=False
+                                        )
+                                        ma2_video_remove_mask_button = gr.Button(
+                                            value="Remove Masks", interactive=True, visible=False
+                                        )
+                                        ma2_video_matting_button = gr.Button(
+                                            value="Video Matting", interactive=True, visible=False
+                                        )
+
+                            gr.Markdown("---")
+
+                            with gr.Row():
+                                with gr.Column(scale=2):
+                                    ma2_video_foreground_output = gr.Video(
+                                        label="Foreground Output", visible=False
+                                    )
+                                with gr.Column(scale=2):
+                                    ma2_video_alpha_output = gr.Video(
+                                        label="Alpha Output", visible=False
+                                    )
+
+                        # Event handlers for Video tab
+                        ma2_load_video_button.click(
+                            fn=get_frames_from_video_v2,
+                            inputs=[ma2_video_input, ma2_video_state, ma2_video_performance_profile],
+                            outputs=[
+                                ma2_video_state,
+                                ma2_video_info,
+                                ma2_video_template_frame,
+                                ma2_video_start_frame,
+                                ma2_video_end_frame,
+                                ma2_video_point_prompt,
+                                ma2_video_clear_button,
+                                ma2_video_add_mask_button,
+                                ma2_video_remove_mask_button,
+                                ma2_video_matting_button,
+                                ma2_video_template_frame,
+                                ma2_video_foreground_output,
+                                ma2_video_alpha_output,
+                                ma2_video_mask_dropdown,
+                                ma2_video_step2_title,
+                            ],
+                        )
+
+                        ma2_video_start_frame.release(
+                            fn=select_video_template_v2,
+                            inputs=[ma2_video_start_frame, ma2_video_state, ma2_video_interactive_state],
+                            outputs=[ma2_video_template_frame, ma2_video_state, ma2_video_interactive_state],
+                        )
+
+                        ma2_video_end_frame.release(
+                            fn=get_end_number_v2,
+                            inputs=[ma2_video_end_frame, ma2_video_state, ma2_video_interactive_state],
+                            outputs=[ma2_video_template_frame, ma2_video_interactive_state],
+                        )
+
+                        ma2_video_template_frame.select(
+                            fn=sam_refine_v2,
+                            inputs=[
+                                ma2_video_state,
+                                ma2_video_point_prompt,
+                                ma2_video_click_state,
+                                ma2_video_interactive_state,
+                            ],
+                            outputs=[ma2_video_template_frame, ma2_video_state, ma2_video_interactive_state],
+                        )
+
+                        ma2_video_add_mask_button.click(
+                            fn=add_multi_mask_v2,
+                            inputs=[ma2_video_state, ma2_video_interactive_state, ma2_video_mask_dropdown],
+                            outputs=[
+                                ma2_video_interactive_state,
+                                ma2_video_mask_dropdown,
+                                ma2_video_template_frame,
+                                ma2_video_click_state,
+                            ],
+                        )
+
+                        ma2_video_remove_mask_button.click(
+                            fn=remove_multi_mask_v2,
+                            inputs=[ma2_video_interactive_state, ma2_video_mask_dropdown],
+                            outputs=[ma2_video_interactive_state, ma2_video_mask_dropdown],
+                        )
+
+                        ma2_video_matting_button.click(
+                            fn=video_matting_v2,
+                            inputs=[
+                                ma2_video_state,
+                                ma2_video_interactive_state,
+                                ma2_video_mask_dropdown,
+                                ma2_video_erode,
+                                ma2_video_dilate,
+                                ma2_video_model_selection,
+                                ma2_video_performance_profile,
+                            ],
+                            outputs=[ma2_video_foreground_output, ma2_video_alpha_output],
+                        )
+
+                        ma2_video_mask_dropdown.change(
+                            fn=show_mask_v2,
+                            inputs=[ma2_video_state, ma2_video_interactive_state, ma2_video_mask_dropdown],
+                            outputs=[ma2_video_template_frame],
+                        )
+
+                        ma2_video_input.change(
+                            fn=restart_v2,
+                            inputs=[],
+                            outputs=[
+                                ma2_video_state,
+                                ma2_video_interactive_state,
+                                ma2_video_click_state,
+                                ma2_video_foreground_output,
+                                ma2_video_alpha_output,
+                                ma2_video_template_frame,
+                                ma2_video_start_frame,
+                                ma2_video_end_frame,
+                                ma2_video_point_prompt,
+                                ma2_video_clear_button,
+                                ma2_video_add_mask_button,
+                                ma2_video_matting_button,
+                                ma2_video_template_frame,
+                                ma2_video_foreground_output,
+                                ma2_video_alpha_output,
+                                ma2_video_remove_mask_button,
+                                ma2_video_mask_dropdown,
+                                ma2_video_info,
+                                ma2_video_step2_title,
+                            ],
+                            queue=False,
+                            show_progress=False,
+                        )
+
+                        ma2_video_input.clear(
+                            fn=restart_v2,
+                            inputs=[],
+                            outputs=[
+                                ma2_video_state,
+                                ma2_video_interactive_state,
+                                ma2_video_click_state,
+                                ma2_video_foreground_output,
+                                ma2_video_alpha_output,
+                                ma2_video_template_frame,
+                                ma2_video_start_frame,
+                                ma2_video_end_frame,
+                                ma2_video_point_prompt,
+                                ma2_video_clear_button,
+                                ma2_video_add_mask_button,
+                                ma2_video_matting_button,
+                                ma2_video_template_frame,
+                                ma2_video_foreground_output,
+                                ma2_video_alpha_output,
+                                ma2_video_remove_mask_button,
+                                ma2_video_mask_dropdown,
+                                ma2_video_info,
+                                ma2_video_step2_title,
+                            ],
+                            queue=False,
+                            show_progress=False,
+                        )
+
+                        ma2_video_clear_button.click(
+                            fn=clear_click_v2,
+                            inputs=[ma2_video_state, ma2_video_click_state],
+                            outputs=[ma2_video_template_frame, ma2_video_click_state],
+                        )
+
+                        if video_examples:
+                            gr.Examples(examples=video_examples, inputs=[ma2_image_input])
+                        ma2_image_interactive_state = gr.State({
+                            "inference_times": 0,
+                            "negative_click_times": 0,
+                            "positive_click_times": 0,
+                            "mask_save": False,
+                            "multi_mask": {"mask_names": [], "masks": []},
+                            "track_end_number": None,
+                        })
+                        ma2_image_state = gr.State({
+                            "user_name": "",
+                            "image_name": "",
+                            "origin_images": None,
+                            "painted_images": None,
+                            "masks": None,
+                            "inpaint_masks": None,
+                            "logits": None,
+                            "select_frame_number": 0,
+                            "fps": 30,
+                            "source_fps": 30,
+                            "frame_stride": 1,
+                            "source_size": None,
+                            "working_size": None,
+                            "performance_profile": args.performance_profile,
+                            "audio": "",
+                        })
+
+                        with gr.Group():
+                            with gr.Row():
+                                ma2_image_model_selection = gr.Radio(
+                                    choices=available_models,
+                                    value=default_model,
+                                    label="Model Selection",
+                                    info="Choose the model to use for matting",
+                                    interactive=True,
+                                )
+                                ma2_image_performance_profile = gr.Radio(
+                                    choices=PROFILE_CHOICES,
+                                    value=args.performance_profile,
+                                    label="Performance Profile",
+                                    info="CPU auto uses fast. Faster profiles reduce working resolution.",
+                                    interactive=True,
+                                )
+                            with gr.Accordion("Matting Settings", open=False):
+                                with gr.Row():
+                                    ma2_image_erode = gr.Slider(
+                                        label="Erode Kernel Size",
+                                        minimum=0,
+                                        maximum=30,
+                                        step=1,
+                                        value=10,
+                                        info="Erosion on the added mask",
+                                        interactive=True,
+                                    )
+                                    ma2_image_dilate = gr.Slider(
+                                        label="Dilate Kernel Size",
+                                        minimum=0,
+                                        maximum=30,
+                                        step=1,
+                                        value=10,
+                                        info="Dilation on the added mask",
+                                        interactive=True,
+                                    )
+                                with gr.Row():
+                                    ma2_image_refine_iter = gr.Slider(
+                                        minimum=1,
+                                        maximum=100,
+                                        step=1,
+                                        value=10,
+                                        label="Num of Refinement Iterations",
+                                        info="More iterations = More details & More time",
+                                        visible=False,
+                                    )
+                                    ma2_image_track_end = gr.Slider(
+                                        minimum=1,
+                                        maximum=100,
+                                        step=1,
+                                        value=1,
+                                        label="Track End Frame",
+                                        visible=False,
+                                    )
+                                with gr.Row():
+                                    ma2_image_point_prompt = gr.Radio(
+                                        choices=["Positive", "Negative"],
+                                        value="Positive",
+                                        label="Point Prompt",
+                                        info="Click to add positive or negative point",
+                                        interactive=True,
+                                        visible=False,
+                                    )
+                                    ma2_image_mask_dropdown = gr.Dropdown(
+                                        multiselect=True,
+                                        value=[],
+                                        label="Mask Selection",
+                                        info="Choose 1~all mask(s) added",
+                                        visible=False,
+                                    )
+
+                        gr.Markdown("---")
+
+                        with gr.Column():
+                            with gr.Row():
+                                with gr.Column(scale=2):
+                                    gr.Markdown("## Step1: Upload image")
+                                with gr.Column(scale=2):
+                                    ma2_image_step2_title = gr.Markdown(
+                                        "## Step2: Add masks <small>(Click then **Add Mask**)</small>",
+                                        visible=False,
+                                    )
+                            with gr.Row():
+                                with gr.Column(scale=2):
+                                    ma2_image_input = gr.Image(label="Input Image")
+                                    ma2_load_image_button = gr.Button(value="Load Image", interactive=True)
+                                with gr.Column(scale=2):
+                                    ma2_image_info = gr.Textbox(label="Image Info", visible=False)
+                                    ma2_image_template_frame = gr.Image(
+                                        type="pil",
+                                        label="Interactive Frame",
+                                        interactive=True,
+                                        visible=False,
+                                    )
+                                    with gr.Row():
+                                        ma2_image_clear_button = gr.Button(
+                                            value="Clear Clicks", interactive=True, visible=False
+                                        )
+                                        ma2_image_add_mask_button = gr.Button(
+                                            value="Add Mask", interactive=True, visible=False
+                                        )
+                                        ma2_image_remove_mask_button = gr.Button(
+                                            value="Remove Masks", interactive=True, visible=False
+                                        )
+                                        ma2_image_matting_button = gr.Button(
+                                            value="Image Matting", interactive=True, visible=False
+                                        )
+
+                            gr.Markdown("---")
+
+                            with gr.Row():
+                                with gr.Column(scale=2):
+                                    ma2_image_foreground_output = gr.Image(
+                                        type="pil", label="Foreground Output", visible=False
+                                    )
+                                with gr.Column(scale=2):
+                                    ma2_image_alpha_output = gr.Image(
+                                        type="pil", label="Alpha Output", visible=False
+                                    )
+
+                        # Event handlers for Image tab
+                        ma2_load_image_button.click(
+                            fn=get_frames_from_image_v2,
+                            inputs=[ma2_image_input, ma2_image_state, ma2_image_performance_profile],
+                            outputs=[
+                                ma2_image_state,
+                                ma2_image_info,
+                                ma2_image_template_frame,
+                                ma2_image_refine_iter,
+                                ma2_image_track_end,
+                                ma2_image_point_prompt,
+                                ma2_image_clear_button,
+                                ma2_image_add_mask_button,
+                                ma2_image_remove_mask_button,
+                                ma2_image_matting_button,
+                                ma2_image_template_frame,
+                                ma2_image_foreground_output,
+                                ma2_image_alpha_output,
+                                ma2_image_mask_dropdown,
+                                ma2_image_step2_title,
+                            ],
+                        )
+
+                        ma2_image_refine_iter.release(
+                            fn=select_image_template_v2,
+                            inputs=[ma2_image_refine_iter, ma2_image_state, ma2_image_interactive_state],
+                            outputs=[ma2_image_template_frame, ma2_image_state, ma2_image_interactive_state],
+                        )
+
+                        ma2_image_template_frame.select(
+                            fn=sam_refine_v2,
+                            inputs=[
+                                ma2_image_state,
+                                ma2_image_point_prompt,
+                                ma2_image_click_state,
+                                ma2_image_interactive_state,
+                            ],
+                            outputs=[ma2_image_template_frame, ma2_image_state, ma2_image_interactive_state],
+                        )
+
+                        ma2_image_add_mask_button.click(
+                            fn=add_multi_mask_v2,
+                            inputs=[ma2_image_state, ma2_image_interactive_state, ma2_image_mask_dropdown],
+                            outputs=[
+                                ma2_image_interactive_state,
+                                ma2_image_mask_dropdown,
+                                ma2_image_template_frame,
+                                ma2_image_click_state,
+                            ],
+                        )
+
+                        ma2_image_remove_mask_button.click(
+                            fn=remove_multi_mask_v2,
+                            inputs=[ma2_image_interactive_state, ma2_image_mask_dropdown],
+                            outputs=[ma2_image_interactive_state, ma2_image_mask_dropdown],
+                        )
+
+                        ma2_image_matting_button.click(
+                            fn=image_matting_v2,
+                            inputs=[
+                                ma2_image_state,
+                                ma2_image_interactive_state,
+                                ma2_image_mask_dropdown,
+                                ma2_image_erode,
+                                ma2_image_dilate,
+                                ma2_image_refine_iter,
+                                ma2_image_model_selection,
+                                ma2_image_performance_profile,
+                            ],
+                            outputs=[ma2_image_foreground_output, ma2_image_alpha_output],
+                        )
+
+                        ma2_image_mask_dropdown.change(
+                            fn=show_mask_v2,
+                            inputs=[ma2_image_state, ma2_image_interactive_state, ma2_image_mask_dropdown],
+                            outputs=[ma2_image_template_frame],
+                        )
+
+                        ma2_image_input.change(
+                            fn=restart_v2,
+                            inputs=[],
+                            outputs=[
+                                ma2_image_state,
+                                ma2_image_interactive_state,
+                                ma2_image_click_state,
+                                ma2_image_foreground_output,
+                                ma2_image_alpha_output,
+                                ma2_image_template_frame,
+                                ma2_image_refine_iter,
+                                ma2_image_track_end,
+                                ma2_image_point_prompt,
+                                ma2_image_clear_button,
+                                ma2_image_add_mask_button,
+                                ma2_image_matting_button,
+                                ma2_image_template_frame,
+                                ma2_image_foreground_output,
+                                ma2_image_alpha_output,
+                                ma2_image_remove_mask_button,
+                                ma2_image_mask_dropdown,
+                                ma2_image_info,
+                                ma2_image_step2_title,
+                            ],
+                            queue=False,
+                            show_progress=False,
+                        )
+
+                        ma2_image_input.clear(
+                            fn=restart_v2,
+                            inputs=[],
+                            outputs=[
+                                ma2_image_state,
+                                ma2_image_interactive_state,
+                                ma2_image_click_state,
+                                ma2_image_foreground_output,
+                                ma2_image_alpha_output,
+                                ma2_image_template_frame,
+                                ma2_image_refine_iter,
+                                ma2_image_track_end,
+                                ma2_image_point_prompt,
+                                ma2_image_clear_button,
+                                ma2_image_add_mask_button,
+                                ma2_image_matting_button,
+                                ma2_image_template_frame,
+                                ma2_image_foreground_output,
+                                ma2_image_alpha_output,
+                                ma2_image_remove_mask_button,
+                                ma2_image_mask_dropdown,
+                                ma2_image_info,
+                                ma2_image_step2_title,
+                            ],
+                            queue=False,
+                            show_progress=False,
+                        )
+
+                        ma2_image_clear_button.click(
+                            fn=clear_click_v2,
+                            inputs=[ma2_image_state, ma2_image_click_state],
+                            outputs=[ma2_image_template_frame, ma2_image_click_state],
+                        )
+
+                        if image_examples:
+                            gr.Examples(examples=image_examples, inputs=[ma2_image_input])
+
+            # ========== End MatAnyone2 Tab ==========
 
                     build_cli_export_tab(
                         tab_label="backend",

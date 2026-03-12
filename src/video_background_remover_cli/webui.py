@@ -1242,7 +1242,12 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             model_name=model_selection,
         )
         print(f"Saved debug artifacts to {debug_dir}")
-        return foreground_output, alpha_output
+        print(f"[Video Matting] Foreground: {foreground_output}")
+        print(f"[Video Matting] Alpha: {alpha_output}")
+        return (
+            gr.update(value=foreground_output, visible=True),
+            gr.update(value=alpha_output, visible=True),
+        )
 
     def export_to_webp_v2(
         fg_video_path: str,

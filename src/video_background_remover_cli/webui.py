@@ -1455,230 +1455,6 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                         gr.Video(value=str(tutorial_multi), label="Multiple Targets Tutorial")
 
         with gr.Tabs():
-            with gr.TabItem("Video"):
-                video_state_default, interactive_state_default = reset_states(args.performance_profile)
-                video_state = gr.State(video_state_default)
-                interactive_state = gr.State(interactive_state_default)
-                video_click_state = gr.State([[], []])
-                video_export_state = gr.State({})
-
-                with gr.Row():
-                    video_model_selection = gr.Radio(choices=available_models, value=default_model, label="Model Selection")
-                    video_profile = gr.Radio(choices=PROFILE_CHOICES, value=args.performance_profile, label="Performance Profile")
-
-                with gr.Accordion("Matting Settings", open=False):
-                    with gr.Row():
-                        video_erode = gr.Slider(label="Erode Kernel Size", minimum=0, maximum=30, step=1, value=10)
-                        video_dilate = gr.Slider(label="Dilate Kernel Size", minimum=0, maximum=30, step=1, value=10)
-                    with gr.Row():
-                        video_start_frame = gr.Slider(minimum=1, maximum=100, step=1, value=1, label="Start Frame", visible=False)
-                        video_end_frame = gr.Slider(minimum=1, maximum=100, step=1, value=1, label="Track End Frame", visible=False)
-                    with gr.Row():
-                        video_point_prompt = gr.Radio(choices=["Positive", "Negative"], value="Positive", label="Point Prompt", visible=False)
-                        video_mask_dropdown = gr.Dropdown(multiselect=True, value=[], label="Mask Selection", visible=False)
-
-                with gr.Row():
-                    with gr.Column(scale=2):
-                        video_input = gr.Video(label="Input Video")
-                        load_video_button = gr.Button("Load Video")
-                        video_info = gr.Textbox(label="Video Info", lines=6)
-                    with gr.Column(scale=2):
-                        video_template_frame = gr.Image(type="pil", label="Interactive Frame", interactive=True, visible=False)
-                        with gr.Row():
-                            video_clear_button = gr.Button("Clear Clicks", visible=False)
-                            video_add_mask_button = gr.Button("Add Mask", visible=False)
-                            video_remove_mask_button = gr.Button("Remove Masks", visible=False)
-                            video_matting_button = gr.Button("Video Matting", visible=False)
-
-                with gr.Row():
-                    video_foreground_output = gr.Video(label="Foreground Output", visible=False)
-                    video_alpha_output = gr.Video(label="Alpha Output", visible=False)
-                video_matting_files = gr.File(label="Saved Video Files", file_count="multiple", visible=False)
-                video_status = gr.Textbox(label="Status", lines=4)
-
-                with gr.Group(visible=False) as video_export_group:
-                    gr.Markdown("### Extra Exports")
-                    with gr.Row():
-                        video_export_mode = gr.Radio(
-                            choices=[
-                                ("Animated WebP", "animated_webp"),
-                                ("Animated GIF", "animated_gif"),
-                                ("Animated WebP + GIF", "animated_both"),
-                                ("Transparent Frames (WebP ZIP)", "frames_webp"),
-                                ("Transparent Frames (PNG ZIP)", "frames_png"),
-                                ("Transparent WebM", "video_webm"),
-                                ("Flattened MP4", "video_mp4"),
-                            ],
-                            value="animated_webp",
-                            label="Export Mode",
-                        )
-                        video_export_fps = gr.Slider(minimum=1, maximum=30, step=1, value=10, label="Output FPS")
-                        video_export_max_frames = gr.Number(value=120, precision=0, label="Max Frames (0 = all)")
-                    with gr.Row():
-                        video_export_interval = gr.Number(value=1.0, label="Frame Interval Seconds")
-                        video_export_size = gr.Textbox(value="", label="Output Size (WIDTHxHEIGHT)")
-                        video_export_radius = gr.Slider(minimum=0, maximum=128, step=1, value=0, label="Corner Radius")
-                    with gr.Row():
-                        video_export_bg_preset = gr.Dropdown(
-                            choices=["transparent", "white", "black", "green", "blue", "red", "gray"],
-                            value="transparent",
-                            label="MP4 Background Preset",
-                        )
-                        video_export_bg_custom = gr.Textbox(value="", label="Custom RGB for MP4 (optional)", placeholder="255,128,0")
-                        video_export_bg_image = gr.File(file_types=["image"], type="filepath", label="Background Image for MP4 (optional)")
-                    video_export_button = gr.Button("Export Results")
-                    video_export_files = gr.File(label="Exported Files", file_count="multiple", visible=False)
-                    video_export_status = gr.Textbox(label="Export Status", lines=4)
-
-                load_video_button.click(
-                    fn=load_video_input,
-                    inputs=[video_input, video_profile],
-                    outputs=[
-                        video_state, interactive_state, video_click_state, video_template_frame, video_info,
-                        video_start_frame, video_end_frame, video_point_prompt, video_mask_dropdown,
-                        video_clear_button, video_add_mask_button, video_remove_mask_button, video_matting_button,
-                        video_foreground_output, video_alpha_output, video_matting_files, video_export_state,
-                        video_export_group, video_export_files, video_status, video_export_status,
-                    ],
-                )
-                video_start_frame.release(fn=select_media_frame, inputs=[video_start_frame, video_state, interactive_state], outputs=[video_template_frame, video_state, interactive_state])
-                video_end_frame.release(fn=set_track_end, inputs=[video_end_frame, video_state, interactive_state], outputs=[video_template_frame, interactive_state])
-                video_template_frame.select(fn=sam_refine, inputs=[video_state, video_point_prompt, video_click_state, interactive_state], outputs=[video_template_frame, video_state, interactive_state])
-                video_add_mask_button.click(fn=add_multi_mask, inputs=[video_state, interactive_state, video_mask_dropdown], outputs=[interactive_state, video_mask_dropdown, video_template_frame, video_click_state])
-                video_remove_mask_button.click(fn=remove_multi_mask, inputs=[interactive_state], outputs=[interactive_state, video_mask_dropdown])
-                video_mask_dropdown.change(fn=show_mask, inputs=[video_state, interactive_state, video_mask_dropdown], outputs=[video_template_frame])
-                video_clear_button.click(fn=clear_clicks, inputs=[video_state], outputs=[video_template_frame, video_click_state])
-                video_matting_button.click(
-                    fn=video_matting,
-                    inputs=[video_state, interactive_state, video_mask_dropdown, video_erode, video_dilate, video_model_selection, video_profile],
-                    outputs=[video_foreground_output, video_alpha_output, video_matting_files, video_export_state, video_export_group, video_status],
-                )
-                video_export_button.click(
-                    fn=export_video_results,
-                    inputs=[
-                        video_export_state, video_export_mode, video_export_fps, video_export_max_frames,
-                        video_export_interval, video_export_size, video_export_radius, video_export_bg_preset,
-                        video_export_bg_custom, video_export_bg_image,
-                    ],
-                    outputs=[video_export_files, video_export_status],
-                )
-                video_input.change(
-                    fn=reset_video_tab,
-                    inputs=[],
-                    outputs=[
-                        video_state, interactive_state, video_click_state, video_template_frame, video_info,
-                        video_start_frame, video_end_frame, video_point_prompt, video_mask_dropdown,
-                        video_clear_button, video_add_mask_button, video_remove_mask_button, video_matting_button,
-                        video_foreground_output, video_alpha_output, video_matting_files, video_export_state,
-                        video_export_group, video_export_files, video_status, video_export_status,
-                    ],
-                    queue=False,
-                    show_progress=False,
-                )
-                video_input.clear(
-                    fn=reset_video_tab,
-                    inputs=[],
-                    outputs=[
-                        video_state, interactive_state, video_click_state, video_template_frame, video_info,
-                        video_start_frame, video_end_frame, video_point_prompt, video_mask_dropdown,
-                        video_clear_button, video_add_mask_button, video_remove_mask_button, video_matting_button,
-                        video_foreground_output, video_alpha_output, video_matting_files, video_export_state,
-                        video_export_group, video_export_files, video_status, video_export_status,
-                    ],
-                    queue=False,
-                    show_progress=False,
-                )
-                if video_examples:
-                    gr.Examples(examples=video_examples, inputs=[video_input])
-
-            with gr.TabItem("Image"):
-                image_state_default, image_interactive_default = reset_states(args.performance_profile)
-                image_state = gr.State(image_state_default)
-                image_interactive_state = gr.State(image_interactive_default)
-                image_click_state = gr.State([[], []])
-
-                with gr.Row():
-                    image_model_selection = gr.Radio(choices=available_models, value=default_model, label="Model Selection")
-                    image_profile = gr.Radio(choices=PROFILE_CHOICES, value=args.performance_profile, label="Performance Profile")
-
-                with gr.Accordion("Matting Settings", open=False):
-                    with gr.Row():
-                        image_erode = gr.Slider(label="Erode Kernel Size", minimum=0, maximum=30, step=1, value=10)
-                        image_dilate = gr.Slider(label="Dilate Kernel Size", minimum=0, maximum=30, step=1, value=10)
-                    with gr.Row():
-                        image_refine_iter = gr.Slider(minimum=1, maximum=10, step=1, value=10, label="Num of Refinement Iterations", visible=False)
-                        image_track_end = gr.Slider(minimum=1, maximum=1, step=1, value=1, label="Track End Frame", visible=False)
-                    with gr.Row():
-                        image_point_prompt = gr.Radio(choices=["Positive", "Negative"], value="Positive", label="Point Prompt", visible=False)
-                        image_mask_dropdown = gr.Dropdown(multiselect=True, value=[], label="Mask Selection", visible=False)
-
-                with gr.Row():
-                    with gr.Column(scale=2):
-                        image_input = gr.Image(label="Input Image")
-                        load_image_button = gr.Button("Load Image")
-                        image_info = gr.Textbox(label="Image Info", lines=6)
-                    with gr.Column(scale=2):
-                        image_template_frame = gr.Image(type="pil", label="Interactive Image", interactive=True, visible=False)
-                        with gr.Row():
-                            image_clear_button = gr.Button("Clear Clicks", visible=False)
-                            image_add_mask_button = gr.Button("Add Mask", visible=False)
-                            image_remove_mask_button = gr.Button("Remove Masks", visible=False)
-                            image_matting_button = gr.Button("Image Matting", visible=False)
-
-                with gr.Row():
-                    image_foreground_output = gr.Image(label="Foreground Output", visible=False)
-                    image_alpha_output = gr.Image(label="Alpha Output", visible=False)
-                image_files = gr.File(label="Saved Image Files", file_count="multiple", visible=False)
-                image_status = gr.Textbox(label="Status", lines=4)
-
-                load_image_button.click(
-                    fn=load_image_input,
-                    inputs=[image_input, image_profile],
-                    outputs=[
-                        image_state, image_interactive_state, image_click_state, image_template_frame, image_info,
-                        image_refine_iter, image_track_end, image_point_prompt, image_mask_dropdown,
-                        image_clear_button, image_add_mask_button, image_remove_mask_button, image_matting_button,
-                        image_foreground_output, image_alpha_output, image_files, image_status,
-                    ],
-                )
-                image_refine_iter.release(fn=select_image_template, inputs=[image_refine_iter, image_state, image_interactive_state], outputs=[image_template_frame, image_state, image_interactive_state])
-                image_template_frame.select(fn=sam_refine, inputs=[image_state, image_point_prompt, image_click_state, image_interactive_state], outputs=[image_template_frame, image_state, image_interactive_state])
-                image_add_mask_button.click(fn=add_multi_mask, inputs=[image_state, image_interactive_state, image_mask_dropdown], outputs=[image_interactive_state, image_mask_dropdown, image_template_frame, image_click_state])
-                image_remove_mask_button.click(fn=remove_multi_mask, inputs=[image_interactive_state], outputs=[image_interactive_state, image_mask_dropdown])
-                image_mask_dropdown.change(fn=show_mask, inputs=[image_state, image_interactive_state, image_mask_dropdown], outputs=[image_template_frame])
-                image_clear_button.click(fn=clear_clicks, inputs=[image_state], outputs=[image_template_frame, image_click_state])
-                image_matting_button.click(
-                    fn=image_matting,
-                    inputs=[image_state, image_interactive_state, image_mask_dropdown, image_erode, image_dilate, image_refine_iter, image_model_selection, image_profile],
-                    outputs=[image_foreground_output, image_alpha_output, image_files, image_status],
-                )
-                image_input.change(
-                    fn=reset_image_tab,
-                    inputs=[],
-                    outputs=[
-                        image_state, image_interactive_state, image_click_state, image_template_frame, image_info,
-                        image_refine_iter, image_track_end, image_point_prompt, image_mask_dropdown,
-                        image_clear_button, image_add_mask_button, image_remove_mask_button, image_matting_button,
-                        image_foreground_output, image_alpha_output, image_files, image_status,
-                    ],
-                    queue=False,
-                    show_progress=False,
-                )
-                image_input.clear(
-                    fn=reset_image_tab,
-                    inputs=[],
-                    outputs=[
-                        image_state, image_interactive_state, image_click_state, image_template_frame, image_info,
-                        image_refine_iter, image_track_end, image_point_prompt, image_mask_dropdown,
-                        image_clear_button, image_add_mask_button, image_remove_mask_button, image_matting_button,
-                        image_foreground_output, image_alpha_output, image_files, image_status,
-                    ],
-                    queue=False,
-                    show_progress=False,
-                )
-                if image_examples:
-                    gr.Examples(examples=image_examples, inputs=[image_input])
-
             build_cli_export_tab(
                 tab_label="rembg",
                 source_mode_value="regular",
@@ -1689,28 +1465,255 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                 manual_input_placeholder=r"D:\path\to\input.mp4",
                 examples=cli_examples_by_mode["regular"],
             )
-            build_cli_export_tab(
-                tab_label="MatAnyone backend",
-                source_mode_value="matanyone_backend",
-                description=(
-                    "Run a regular input through the MatAnyone backend from this app. "
-                    "Use this tab when you want interactive point settings and MatAnyone runtime controls."
-                ),
-                manual_input_placeholder=r"D:\path\to\input.mp4",
-                examples=cli_examples_by_mode["matanyone_backend"],
-                show_matanyone_settings=True,
-            )
-            build_cli_export_tab(
-                tab_label="MatAnyone fg+alpha pair",
-                source_mode_value="matanyone_pair",
-                description=(
-                    "Convert an existing MatAnyone foreground/alpha pair into webp, gif, png, mp4, or webm. "
-                    "You can point this tab at a *_fg.mp4 file, a matching alpha file, or a folder that contains the pair."
-                ),
-                manual_input_placeholder=r"D:\path\to\clip_fg.mp4 or D:\path\to\MatAnyone_dir",
-                examples=cli_examples_by_mode["matanyone_pair"],
-                show_alpha_inputs=True,
-            )
+
+            with gr.TabItem("MatAnyone"):
+                with gr.Tabs():
+                    with gr.TabItem("Video"):
+                        video_state_default, interactive_state_default = reset_states(args.performance_profile)
+                        video_state = gr.State(video_state_default)
+                        interactive_state = gr.State(interactive_state_default)
+                        video_click_state = gr.State([[], []])
+                        video_export_state = gr.State({})
+
+                        with gr.Row():
+                            video_model_selection = gr.Radio(choices=available_models, value=default_model, label="Model Selection")
+                            video_profile = gr.Radio(choices=PROFILE_CHOICES, value=args.performance_profile, label="Performance Profile")
+
+                        with gr.Accordion("Matting Settings", open=False):
+                            with gr.Row():
+                                video_erode = gr.Slider(label="Erode Kernel Size", minimum=0, maximum=30, step=1, value=10)
+                                video_dilate = gr.Slider(label="Dilate Kernel Size", minimum=0, maximum=30, step=1, value=10)
+                            with gr.Row():
+                                video_start_frame = gr.Slider(minimum=1, maximum=100, step=1, value=1, label="Start Frame", visible=False)
+                                video_end_frame = gr.Slider(minimum=1, maximum=100, step=1, value=1, label="Track End Frame", visible=False)
+                            with gr.Row():
+                                video_point_prompt = gr.Radio(choices=["Positive", "Negative"], value="Positive", label="Point Prompt", visible=False)
+                                video_mask_dropdown = gr.Dropdown(multiselect=True, value=[], label="Mask Selection", visible=False)
+
+                        with gr.Row():
+                            with gr.Column(scale=2):
+                                video_input = gr.Video(label="Input Video")
+                                load_video_button = gr.Button("Load Video")
+                                video_info = gr.Textbox(label="Video Info", lines=6)
+                            with gr.Column(scale=2):
+                                video_template_frame = gr.Image(type="pil", label="Interactive Frame", interactive=True, visible=False)
+                                with gr.Row():
+                                    video_clear_button = gr.Button("Clear Clicks", visible=False)
+                                    video_add_mask_button = gr.Button("Add Mask", visible=False)
+                                    video_remove_mask_button = gr.Button("Remove Masks", visible=False)
+                                    video_matting_button = gr.Button("Video Matting", visible=False)
+
+                        with gr.Row():
+                            video_foreground_output = gr.Video(label="Foreground Output", visible=False)
+                            video_alpha_output = gr.Video(label="Alpha Output", visible=False)
+                        video_matting_files = gr.File(label="Saved Video Files", file_count="multiple", visible=False)
+                        video_status = gr.Textbox(label="Status", lines=4)
+
+                        with gr.Group(visible=False) as video_export_group:
+                            gr.Markdown("### Extra Exports")
+                            with gr.Row():
+                                video_export_mode = gr.Radio(
+                                    choices=[
+                                        ("Animated WebP", "animated_webp"),
+                                        ("Animated GIF", "animated_gif"),
+                                        ("Animated WebP + GIF", "animated_both"),
+                                        ("Transparent Frames (WebP ZIP)", "frames_webp"),
+                                        ("Transparent Frames (PNG ZIP)", "frames_png"),
+                                        ("Transparent WebM", "video_webm"),
+                                        ("Flattened MP4", "video_mp4"),
+                                    ],
+                                    value="animated_webp",
+                                    label="Export Mode",
+                                )
+                                video_export_fps = gr.Slider(minimum=1, maximum=30, step=1, value=10, label="Output FPS")
+                                video_export_max_frames = gr.Number(value=120, precision=0, label="Max Frames (0 = all)")
+                            with gr.Row():
+                                video_export_interval = gr.Number(value=1.0, label="Frame Interval Seconds")
+                                video_export_size = gr.Textbox(value="", label="Output Size (WIDTHxHEIGHT)")
+                                video_export_radius = gr.Slider(minimum=0, maximum=128, step=1, value=0, label="Corner Radius")
+                            with gr.Row():
+                                video_export_bg_preset = gr.Dropdown(
+                                    choices=["transparent", "white", "black", "green", "blue", "red", "gray"],
+                                    value="transparent",
+                                    label="MP4 Background Preset",
+                                )
+                                video_export_bg_custom = gr.Textbox(value="", label="Custom RGB for MP4 (optional)", placeholder="255,128,0")
+                                video_export_bg_image = gr.File(file_types=["image"], type="filepath", label="Background Image for MP4 (optional)")
+                            video_export_button = gr.Button("Export Results")
+                            video_export_files = gr.File(label="Exported Files", file_count="multiple", visible=False)
+                            video_export_status = gr.Textbox(label="Export Status", lines=4)
+
+                        load_video_button.click(
+                            fn=load_video_input,
+                            inputs=[video_input, video_profile],
+                            outputs=[
+                                video_state, interactive_state, video_click_state, video_template_frame, video_info,
+                                video_start_frame, video_end_frame, video_point_prompt, video_mask_dropdown,
+                                video_clear_button, video_add_mask_button, video_remove_mask_button, video_matting_button,
+                                video_foreground_output, video_alpha_output, video_matting_files, video_export_state,
+                                video_export_group, video_export_files, video_status, video_export_status,
+                            ],
+                        )
+                        video_start_frame.release(fn=select_media_frame, inputs=[video_start_frame, video_state, interactive_state], outputs=[video_template_frame, video_state, interactive_state])
+                        video_end_frame.release(fn=set_track_end, inputs=[video_end_frame, video_state, interactive_state], outputs=[video_template_frame, interactive_state])
+                        video_template_frame.select(fn=sam_refine, inputs=[video_state, video_point_prompt, video_click_state, interactive_state], outputs=[video_template_frame, video_state, interactive_state])
+                        video_add_mask_button.click(fn=add_multi_mask, inputs=[video_state, interactive_state, video_mask_dropdown], outputs=[interactive_state, video_mask_dropdown, video_template_frame, video_click_state])
+                        video_remove_mask_button.click(fn=remove_multi_mask, inputs=[interactive_state], outputs=[interactive_state, video_mask_dropdown])
+                        video_mask_dropdown.change(fn=show_mask, inputs=[video_state, interactive_state, video_mask_dropdown], outputs=[video_template_frame])
+                        video_clear_button.click(fn=clear_clicks, inputs=[video_state], outputs=[video_template_frame, video_click_state])
+                        video_matting_button.click(
+                            fn=video_matting,
+                            inputs=[video_state, interactive_state, video_mask_dropdown, video_erode, video_dilate, video_model_selection, video_profile],
+                            outputs=[video_foreground_output, video_alpha_output, video_matting_files, video_export_state, video_export_group, video_status],
+                        )
+                        video_export_button.click(
+                            fn=export_video_results,
+                            inputs=[
+                                video_export_state, video_export_mode, video_export_fps, video_export_max_frames,
+                                video_export_interval, video_export_size, video_export_radius, video_export_bg_preset,
+                                video_export_bg_custom, video_export_bg_image,
+                            ],
+                            outputs=[video_export_files, video_export_status],
+                        )
+                        video_input.change(
+                            fn=reset_video_tab,
+                            inputs=[],
+                            outputs=[
+                                video_state, interactive_state, video_click_state, video_template_frame, video_info,
+                                video_start_frame, video_end_frame, video_point_prompt, video_mask_dropdown,
+                                video_clear_button, video_add_mask_button, video_remove_mask_button, video_matting_button,
+                                video_foreground_output, video_alpha_output, video_matting_files, video_export_state,
+                                video_export_group, video_export_files, video_status, video_export_status,
+                            ],
+                            queue=False,
+                            show_progress=False,
+                        )
+                        video_input.clear(
+                            fn=reset_video_tab,
+                            inputs=[],
+                            outputs=[
+                                video_state, interactive_state, video_click_state, video_template_frame, video_info,
+                                video_start_frame, video_end_frame, video_point_prompt, video_mask_dropdown,
+                                video_clear_button, video_add_mask_button, video_remove_mask_button, video_matting_button,
+                                video_foreground_output, video_alpha_output, video_matting_files, video_export_state,
+                                video_export_group, video_export_files, video_status, video_export_status,
+                            ],
+                            queue=False,
+                            show_progress=False,
+                        )
+                        if video_examples:
+                            gr.Examples(examples=video_examples, inputs=[video_input])
+
+                    with gr.TabItem("Image"):
+                        image_state_default, image_interactive_default = reset_states(args.performance_profile)
+                        image_state = gr.State(image_state_default)
+                        image_interactive_state = gr.State(image_interactive_default)
+                        image_click_state = gr.State([[], []])
+
+                        with gr.Row():
+                            image_model_selection = gr.Radio(choices=available_models, value=default_model, label="Model Selection")
+                            image_profile = gr.Radio(choices=PROFILE_CHOICES, value=args.performance_profile, label="Performance Profile")
+
+                        with gr.Accordion("Matting Settings", open=False):
+                            with gr.Row():
+                                image_erode = gr.Slider(label="Erode Kernel Size", minimum=0, maximum=30, step=1, value=10)
+                                image_dilate = gr.Slider(label="Dilate Kernel Size", minimum=0, maximum=30, step=1, value=10)
+                            with gr.Row():
+                                image_refine_iter = gr.Slider(minimum=1, maximum=10, step=1, value=10, label="Num of Refinement Iterations", visible=False)
+                                image_track_end = gr.Slider(minimum=1, maximum=1, step=1, value=1, label="Track End Frame", visible=False)
+                            with gr.Row():
+                                image_point_prompt = gr.Radio(choices=["Positive", "Negative"], value="Positive", label="Point Prompt", visible=False)
+                                image_mask_dropdown = gr.Dropdown(multiselect=True, value=[], label="Mask Selection", visible=False)
+
+                        with gr.Row():
+                            with gr.Column(scale=2):
+                                image_input = gr.Image(label="Input Image")
+                                load_image_button = gr.Button("Load Image")
+                                image_info = gr.Textbox(label="Image Info", lines=6)
+                            with gr.Column(scale=2):
+                                image_template_frame = gr.Image(type="pil", label="Interactive Image", interactive=True, visible=False)
+                                with gr.Row():
+                                    image_clear_button = gr.Button("Clear Clicks", visible=False)
+                                    image_add_mask_button = gr.Button("Add Mask", visible=False)
+                                    image_remove_mask_button = gr.Button("Remove Masks", visible=False)
+                                    image_matting_button = gr.Button("Image Matting", visible=False)
+
+                        with gr.Row():
+                            image_foreground_output = gr.Image(label="Foreground Output", visible=False)
+                            image_alpha_output = gr.Image(label="Alpha Output", visible=False)
+                        image_files = gr.File(label="Saved Image Files", file_count="multiple", visible=False)
+                        image_status = gr.Textbox(label="Status", lines=4)
+
+                        load_image_button.click(
+                            fn=load_image_input,
+                            inputs=[image_input, image_profile],
+                            outputs=[
+                                image_state, image_interactive_state, image_click_state, image_template_frame, image_info,
+                                image_refine_iter, image_track_end, image_point_prompt, image_mask_dropdown,
+                                image_clear_button, image_add_mask_button, image_remove_mask_button, image_matting_button,
+                                image_foreground_output, image_alpha_output, image_files, image_status,
+                            ],
+                        )
+                        image_refine_iter.release(fn=select_image_template, inputs=[image_refine_iter, image_state, image_interactive_state], outputs=[image_template_frame, image_state, image_interactive_state])
+                        image_template_frame.select(fn=sam_refine, inputs=[image_state, image_point_prompt, image_click_state, image_interactive_state], outputs=[image_template_frame, image_state, image_interactive_state])
+                        image_add_mask_button.click(fn=add_multi_mask, inputs=[image_state, image_interactive_state, image_mask_dropdown], outputs=[image_interactive_state, image_mask_dropdown, image_template_frame, image_click_state])
+                        image_remove_mask_button.click(fn=remove_multi_mask, inputs=[image_interactive_state], outputs=[image_interactive_state, image_mask_dropdown])
+                        image_mask_dropdown.change(fn=show_mask, inputs=[image_state, image_interactive_state, image_mask_dropdown], outputs=[image_template_frame])
+                        image_clear_button.click(fn=clear_clicks, inputs=[image_state], outputs=[image_template_frame, image_click_state])
+                        image_matting_button.click(
+                            fn=image_matting,
+                            inputs=[image_state, image_interactive_state, image_mask_dropdown, image_erode, image_dilate, image_refine_iter, image_model_selection, image_profile],
+                            outputs=[image_foreground_output, image_alpha_output, image_files, image_status],
+                        )
+                        image_input.change(
+                            fn=reset_image_tab,
+                            inputs=[],
+                            outputs=[
+                                image_state, image_interactive_state, image_click_state, image_template_frame, image_info,
+                                image_refine_iter, image_track_end, image_point_prompt, image_mask_dropdown,
+                                image_clear_button, image_add_mask_button, image_remove_mask_button, image_matting_button,
+                                image_foreground_output, image_alpha_output, image_files, image_status,
+                            ],
+                            queue=False,
+                            show_progress=False,
+                        )
+                        image_input.clear(
+                            fn=reset_image_tab,
+                            inputs=[],
+                            outputs=[
+                                image_state, image_interactive_state, image_click_state, image_template_frame, image_info,
+                                image_refine_iter, image_track_end, image_point_prompt, image_mask_dropdown,
+                                image_clear_button, image_add_mask_button, image_remove_mask_button, image_matting_button,
+                                image_foreground_output, image_alpha_output, image_files, image_status,
+                            ],
+                            queue=False,
+                            show_progress=False,
+                        )
+                        if image_examples:
+                            gr.Examples(examples=image_examples, inputs=[image_input])
+
+                    build_cli_export_tab(
+                        tab_label="backend",
+                        source_mode_value="matanyone_backend",
+                        description=(
+                            "Run a regular input through the MatAnyone backend from this app. "
+                            "Use this tab when you want interactive point settings and MatAnyone runtime controls."
+                        ),
+                        manual_input_placeholder=r"D:\path\to\input.mp4",
+                        examples=cli_examples_by_mode["matanyone_backend"],
+                        show_matanyone_settings=True,
+                    )
+                    build_cli_export_tab(
+                        tab_label="fg+alpha pair",
+                        source_mode_value="matanyone_pair",
+                        description=(
+                            "Convert an existing MatAnyone foreground/alpha pair into webp, gif, png, mp4, or webm. "
+                            "You can point this tab at a *_fg.mp4 file, a matching alpha file, or a folder that contains the pair."
+                        ),
+                        manual_input_placeholder=r"D:\path\to\clip_fg.mp4 or D:\path\to\MatAnyone_dir",
+                        examples=cli_examples_by_mode["matanyone_pair"],
+                        show_alpha_inputs=True,
+                    )
 
         demo.queue()
         demo.launch(

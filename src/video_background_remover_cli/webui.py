@@ -466,6 +466,23 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             "webp",
         ],
     ]
+    cli_examples_by_mode = {
+        "regular": [
+            [example[1], example[2], example[5], example[6], example[7], example[8], example[9]]
+            for example in cli_examples
+            if example[0] == "regular"
+        ],
+        "matanyone_backend": [
+            [example[1], example[2], example[5], example[6], example[7], example[8], example[9]]
+            for example in cli_examples
+            if example[0] == "matanyone_backend"
+        ],
+        "matanyone_pair": [
+            [example[1], example[2], example[3], example[4], example[5], example[6], example[7], example[8], example[9]]
+            for example in cli_examples
+            if example[0] == "matanyone_pair"
+        ],
+    }
 
     def load_runtime_model(display_name: str):
         return runtime_models.load_model(display_name)
@@ -1016,7 +1033,6 @@ def _launch_in_process(args: argparse.Namespace) -> int:
         animated_format: str,
         frame_format: str,
         rembg_model: str,
-        _regular_backend_marker: str,
         background_preset: str,
         background_custom: str,
         background_image_path: str | None,
@@ -1168,6 +1184,242 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             gr.update(value="\n".join(_collect_existing_files(collected_paths))),
             gr.update(value="\n".join(status_lines)),
         )
+
+    default_matanyone_python = str(resolve_matanyone_python(matanyone_root, args.matanyone_python))
+
+    def build_cli_export_tab(
+        *,
+        tab_label: str,
+        source_mode_value: str,
+        description: str,
+        manual_input_placeholder: str,
+        examples: list[list[Any]],
+        show_alpha_inputs: bool = False,
+        manual_alpha_placeholder: str = r"D:\path\to\clip_alpha.mp4",
+        show_matanyone_settings: bool = False,
+    ) -> None:
+        with gr.TabItem(tab_label):
+            gr.Markdown(description)
+
+            source_mode_state = gr.State(source_mode_value)
+
+            with gr.Row():
+                cli_export_mode = gr.Radio(
+                    choices=[
+                        ("Regular Video Output", "video"),
+                        ("Animated Output", "animated"),
+                        ("Frame Extraction", "interval"),
+                    ],
+                    value="video",
+                    label="Export Mode",
+                )
+
+            with gr.Row():
+                cli_input_upload = gr.File(type="filepath", label="Input File")
+                cli_input_path = gr.Textbox(
+                    label="Or Manual Input Path",
+                    placeholder=manual_input_placeholder,
+                )
+
+            if show_alpha_inputs:
+                with gr.Row():
+                    cli_alpha_upload: Any = gr.File(type="filepath", label="Alpha Video")
+                    cli_alpha_path: Any = gr.Textbox(
+                        label="Or Manual Alpha Path",
+                        placeholder=manual_alpha_placeholder,
+                    )
+            else:
+                cli_alpha_upload = gr.State(None)
+                cli_alpha_path = gr.State("")
+
+            cli_output_path = gr.Textbox(
+                label="Output Path (optional)",
+                placeholder=r"Leave blank to auto-save under output\webui\cli_runs",
+            )
+
+            with gr.Accordion("General Output Settings", open=True):
+                with gr.Row():
+                    cli_video_format = gr.Dropdown(
+                        choices=["mp4", "webm"],
+                        value="mp4",
+                        label="Regular Video Format",
+                    )
+                    cli_animated_format = gr.Dropdown(
+                        choices=["webp", "gif", "both"],
+                        value="webp",
+                        label="Animated Format",
+                    )
+                    cli_frame_format = gr.Dropdown(
+                        choices=["webp", "png"],
+                        value="webp",
+                        label="Frame Format",
+                    )
+                with gr.Row():
+                    cli_regular_fps = gr.Number(value=0, precision=0, label="Video FPS Override (0 = input)")
+                    cli_animated_fps = gr.Number(value=10, precision=0, label="Animated FPS")
+                    cli_max_frames = gr.Number(value=0, precision=0, label="Max Frames (0 = all)")
+                    cli_interval = gr.Number(value=1.0, label="Frame Interval Seconds")
+                with gr.Row():
+                    cli_size = gr.Textbox(value="", label="Output Size (WIDTHxHEIGHT)")
+                    cli_corner_radius = gr.Slider(minimum=0, maximum=128, step=1, value=0, label="Corner Radius")
+                    cli_keep_frames = gr.Checkbox(value=False, label="Keep Intermediate Frames")
+                    cli_no_bg_removal = gr.Checkbox(value=False, label="Skip Background Removal")
+                cli_work_dir = gr.Textbox(
+                    value="",
+                    label="Work Dir (optional)",
+                    placeholder=r"D:\path\to\temp",
+                )
+                with gr.Row():
+                    cli_bg_preset = gr.Dropdown(
+                        choices=["transparent", "white", "black", "green", "blue", "red", "gray"],
+                        value="white",
+                        label="Background Preset",
+                    )
+                    cli_bg_custom = gr.Textbox(value="", label="Custom RGB Background")
+                    cli_bg_image = gr.File(type="filepath", file_types=["image"], label="Background Image")
+                cli_rembg_model = gr.Dropdown(
+                    choices=cli_module.MODEL_CHOICES,
+                    value=cli_module.MODEL_CHOICES[0],
+                    label="rembg Model",
+                )
+
+            if show_matanyone_settings:
+                with gr.Accordion("MatAnyone Backend Settings", open=False):
+                    with gr.Row():
+                        cli_matanyone_root: Any = gr.Textbox(
+                            value=str(matanyone_root),
+                            label="MatAnyone Root",
+                        )
+                        cli_matanyone_python: Any = gr.Textbox(
+                            value=default_matanyone_python,
+                            label="MatAnyone Python",
+                        )
+                    with gr.Row():
+                        cli_matanyone_model: Any = gr.Dropdown(
+                            choices=MATANYONE_MODEL_CHOICES,
+                            value="MatAnyone 2",
+                            label="MatAnyone Model",
+                        )
+                        cli_matanyone_device: Any = gr.Dropdown(
+                            choices=MATANYONE_DEVICE_CHOICES,
+                            value=args.device,
+                            label="MatAnyone Device",
+                        )
+                        cli_matanyone_profile: Any = gr.Dropdown(
+                            choices=MATANYONE_PROFILE_CHOICES,
+                            value=args.performance_profile,
+                            label="Performance Profile",
+                        )
+                        cli_matanyone_sam: Any = gr.Dropdown(
+                            choices=MATANYONE_SAM_MODEL_CHOICES,
+                            value=args.sam_model_type,
+                            label="SAM Model Type",
+                        )
+                    with gr.Row():
+                        cli_matanyone_cpu_threads: Any = gr.Number(value=0, precision=0, label="CPU Threads (0 = auto)")
+                        cli_matanyone_frame_limit: Any = gr.Number(value=0, precision=0, label="Frame Limit (0 = none)")
+                        cli_matanyone_video_target_fps: Any = gr.Number(value=0.0, label="Video Target FPS")
+                        cli_matanyone_output_fps: Any = gr.Number(value=0.0, label="Output FPS Override")
+                    with gr.Row():
+                        cli_matanyone_select_frame: Any = gr.Number(value=0, precision=0, label="Select Frame")
+                        cli_matanyone_end_frame: Any = gr.Number(value=0, precision=0, label="End Frame (0 = none)")
+                    with gr.Row():
+                        cli_positive_points: Any = gr.Textbox(
+                            value="",
+                            lines=4,
+                            label="Positive Points",
+                            placeholder="320,180",
+                        )
+                        cli_negative_points: Any = gr.Textbox(
+                            value="",
+                            lines=4,
+                            label="Negative Points",
+                            placeholder="16,16",
+                        )
+            else:
+                cli_matanyone_root = gr.State("")
+                cli_matanyone_python = gr.State("")
+                cli_matanyone_model = gr.State("MatAnyone 2")
+                cli_matanyone_device = gr.State(args.device)
+                cli_matanyone_profile = gr.State(args.performance_profile)
+                cli_matanyone_sam = gr.State(args.sam_model_type)
+                cli_matanyone_cpu_threads = gr.State(0)
+                cli_matanyone_frame_limit = gr.State(0)
+                cli_matanyone_video_target_fps = gr.State(0.0)
+                cli_matanyone_output_fps = gr.State(0.0)
+                cli_matanyone_select_frame = gr.State(0)
+                cli_matanyone_end_frame = gr.State(0)
+                cli_positive_points = gr.State("")
+                cli_negative_points = gr.State("")
+
+            cli_run_button = gr.Button(f"Run {tab_label}")
+            cli_export_files = gr.Textbox(
+                label="CLI Export Outputs",
+                lines=6,
+                interactive=False,
+            )
+            cli_export_status = gr.Textbox(label="CLI Export Status", lines=6)
+
+            cli_run_button.click(
+                fn=run_cli_export,
+                inputs=[
+                    source_mode_state,
+                    cli_input_upload,
+                    cli_input_path,
+                    cli_alpha_upload,
+                    cli_alpha_path,
+                    cli_output_path,
+                    cli_export_mode,
+                    cli_video_format,
+                    cli_animated_format,
+                    cli_frame_format,
+                    cli_rembg_model,
+                    cli_bg_preset,
+                    cli_bg_custom,
+                    cli_bg_image,
+                    cli_size,
+                    cli_regular_fps,
+                    cli_animated_fps,
+                    cli_max_frames,
+                    cli_interval,
+                    cli_keep_frames,
+                    cli_work_dir,
+                    cli_no_bg_removal,
+                    cli_corner_radius,
+                    cli_matanyone_root,
+                    cli_matanyone_python,
+                    cli_matanyone_model,
+                    cli_matanyone_device,
+                    cli_matanyone_profile,
+                    cli_matanyone_sam,
+                    cli_matanyone_cpu_threads,
+                    cli_matanyone_frame_limit,
+                    cli_matanyone_video_target_fps,
+                    cli_matanyone_output_fps,
+                    cli_matanyone_select_frame,
+                    cli_matanyone_end_frame,
+                    cli_positive_points,
+                    cli_negative_points,
+                ],
+                outputs=[cli_export_files, cli_export_status],
+            )
+
+            example_inputs = [
+                cli_input_upload,
+                cli_input_path,
+            ]
+            if show_alpha_inputs:
+                example_inputs.extend([cli_alpha_upload, cli_alpha_path])
+            example_inputs.extend(
+                [
+                    cli_output_path,
+                    cli_export_mode,
+                    cli_video_format,
+                    cli_animated_format,
+                    cli_frame_format,
+                ]
+            )
+            gr.Examples(examples=examples, inputs=example_inputs)
 
     css = """
     .gradio-container {max-width: 1280px !important; margin: 0 auto;}
@@ -1427,216 +1679,38 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                 if image_examples:
                     gr.Examples(examples=image_examples, inputs=[image_input])
 
-            with gr.TabItem("CLI Export"):
-                gr.Markdown(
-                    "Run the current CLI features from the browser. "
-                    "This covers rembg exports, MatAnyone backend runs, and "
-                    "MatAnyone foreground+alpha pair conversion."
-                )
-
-                with gr.Row():
-                    cli_source_mode = gr.Radio(
-                        choices=[
-                            ("Regular Video / rembg", "regular"),
-                            ("Regular Video / MatAnyone backend", "matanyone_backend"),
-                            ("MatAnyone fg+alpha pair", "matanyone_pair"),
-                        ],
-                        value="regular",
-                        label="Source Mode",
-                    )
-                    cli_export_mode = gr.Radio(
-                        choices=[
-                            ("Regular Video Output", "video"),
-                            ("Animated Output", "animated"),
-                            ("Frame Extraction", "interval"),
-                        ],
-                        value="video",
-                        label="Export Mode",
-                    )
-
-                with gr.Row():
-                    cli_input_upload = gr.File(type="filepath", label="Input File")
-                    cli_input_path = gr.Textbox(
-                        label="Or Manual Input Path",
-                        placeholder=r"D:\path\to\input.mp4 or D:\path\to\MatAnyone_dir",
-                    )
-                with gr.Row():
-                    cli_alpha_upload = gr.File(type="filepath", label="Alpha Video (pair mode)")
-                    cli_alpha_path = gr.Textbox(
-                        label="Or Manual Alpha Path",
-                        placeholder=r"D:\path\to\clip_alpha.mp4",
-                    )
-                cli_output_path = gr.Textbox(
-                    label="Output Path (optional)",
-                    placeholder=r"Leave blank to auto-save under output\webui\cli_runs",
-                )
-
-                with gr.Accordion("General Output Settings", open=True):
-                    with gr.Row():
-                        cli_video_format = gr.Dropdown(
-                            choices=["mp4", "webm"],
-                            value="mp4",
-                            label="Regular Video Format",
-                        )
-                        cli_animated_format = gr.Dropdown(
-                            choices=["webp", "gif", "both"],
-                            value="webp",
-                            label="Animated Format",
-                        )
-                        cli_frame_format = gr.Dropdown(
-                            choices=["webp", "png"],
-                            value="webp",
-                            label="Frame Format",
-                        )
-                    with gr.Row():
-                        cli_regular_fps = gr.Number(value=0, precision=0, label="Video FPS Override (0 = input)")
-                        cli_animated_fps = gr.Number(value=10, precision=0, label="Animated FPS")
-                        cli_max_frames = gr.Number(value=0, precision=0, label="Max Frames (0 = all)")
-                        cli_interval = gr.Number(value=1.0, label="Frame Interval Seconds")
-                    with gr.Row():
-                        cli_size = gr.Textbox(value="", label="Output Size (WIDTHxHEIGHT)")
-                        cli_corner_radius = gr.Slider(minimum=0, maximum=128, step=1, value=0, label="Corner Radius")
-                        cli_keep_frames = gr.Checkbox(value=False, label="Keep Intermediate Frames")
-                        cli_no_bg_removal = gr.Checkbox(value=False, label="Skip Background Removal")
-                    cli_work_dir = gr.Textbox(
-                        value="",
-                        label="Work Dir (optional)",
-                        placeholder=r"D:\path\to\temp",
-                    )
-                    with gr.Row():
-                        cli_bg_preset = gr.Dropdown(
-                            choices=["transparent", "white", "black", "green", "blue", "red", "gray"],
-                            value="white",
-                            label="Background Preset",
-                        )
-                        cli_bg_custom = gr.Textbox(value="", label="Custom RGB Background")
-                        cli_bg_image = gr.File(type="filepath", file_types=["image"], label="Background Image")
-                    cli_rembg_model = gr.Dropdown(
-                        choices=cli_module.MODEL_CHOICES,
-                        value=cli_module.MODEL_CHOICES[0],
-                        label="rembg Model",
-                    )
-
-                with gr.Accordion("MatAnyone Backend Settings", open=False):
-                    with gr.Row():
-                        cli_matanyone_root = gr.Textbox(
-                            value=str(matanyone_root),
-                            label="MatAnyone Root",
-                        )
-                        cli_matanyone_python = gr.Textbox(
-                            value=str(resolve_matanyone_python(matanyone_root, args.matanyone_python)),
-                            label="MatAnyone Python",
-                        )
-                    with gr.Row():
-                        cli_matanyone_model = gr.Dropdown(
-                            choices=MATANYONE_MODEL_CHOICES,
-                            value="MatAnyone 2",
-                            label="MatAnyone Model",
-                        )
-                        cli_matanyone_device = gr.Dropdown(
-                            choices=MATANYONE_DEVICE_CHOICES,
-                            value=args.device,
-                            label="MatAnyone Device",
-                        )
-                        cli_matanyone_profile = gr.Dropdown(
-                            choices=MATANYONE_PROFILE_CHOICES,
-                            value=args.performance_profile,
-                            label="Performance Profile",
-                        )
-                        cli_matanyone_sam = gr.Dropdown(
-                            choices=MATANYONE_SAM_MODEL_CHOICES,
-                            value=args.sam_model_type,
-                            label="SAM Model Type",
-                        )
-                    with gr.Row():
-                        cli_matanyone_cpu_threads = gr.Number(value=0, precision=0, label="CPU Threads (0 = auto)")
-                        cli_matanyone_frame_limit = gr.Number(value=0, precision=0, label="Frame Limit (0 = none)")
-                        cli_matanyone_video_target_fps = gr.Number(value=0.0, label="Video Target FPS")
-                        cli_matanyone_output_fps = gr.Number(value=0.0, label="Output FPS Override")
-                    with gr.Row():
-                        cli_matanyone_select_frame = gr.Number(value=0, precision=0, label="Select Frame")
-                        cli_matanyone_end_frame = gr.Number(value=0, precision=0, label="End Frame (0 = none)")
-                    with gr.Row():
-                        cli_positive_points = gr.Textbox(
-                            value="",
-                            lines=4,
-                            label="Positive Points",
-                            placeholder="320,180",
-                        )
-                        cli_negative_points = gr.Textbox(
-                            value="",
-                            lines=4,
-                            label="Negative Points",
-                            placeholder="16,16",
-                        )
-
-                cli_run_button = gr.Button("Run CLI Export")
-                cli_export_files = gr.Textbox(
-                    label="CLI Export Outputs",
-                    lines=6,
-                    interactive=False,
-                )
-                cli_export_status = gr.Textbox(label="CLI Export Status", lines=6)
-
-                cli_run_button.click(
-                    fn=run_cli_export,
-                    inputs=[
-                        cli_source_mode,
-                        cli_input_upload,
-                        cli_input_path,
-                        cli_alpha_upload,
-                        cli_alpha_path,
-                        cli_output_path,
-                        cli_export_mode,
-                        cli_video_format,
-                        cli_animated_format,
-                        cli_frame_format,
-                        cli_rembg_model,
-                        cli_source_mode,
-                        cli_bg_preset,
-                        cli_bg_custom,
-                        cli_bg_image,
-                        cli_size,
-                        cli_regular_fps,
-                        cli_animated_fps,
-                        cli_max_frames,
-                        cli_interval,
-                        cli_keep_frames,
-                        cli_work_dir,
-                        cli_no_bg_removal,
-                        cli_corner_radius,
-                        cli_matanyone_root,
-                        cli_matanyone_python,
-                        cli_matanyone_model,
-                        cli_matanyone_device,
-                        cli_matanyone_profile,
-                        cli_matanyone_sam,
-                        cli_matanyone_cpu_threads,
-                        cli_matanyone_frame_limit,
-                        cli_matanyone_video_target_fps,
-                        cli_matanyone_output_fps,
-                        cli_matanyone_select_frame,
-                        cli_matanyone_end_frame,
-                        cli_positive_points,
-                        cli_negative_points,
-                    ],
-                    outputs=[cli_export_files, cli_export_status],
-                )
-                gr.Examples(
-                    examples=cli_examples,
-                    inputs=[
-                        cli_source_mode,
-                        cli_input_upload,
-                        cli_input_path,
-                        cli_alpha_upload,
-                        cli_alpha_path,
-                        cli_output_path,
-                        cli_export_mode,
-                        cli_video_format,
-                        cli_animated_format,
-                        cli_frame_format,
-                    ],
-                )
+            build_cli_export_tab(
+                tab_label="rembg",
+                source_mode_value="regular",
+                description=(
+                    "Use the current rembg-based CLI features from the browser. "
+                    "This tab covers standard video export, animated webp/gif, and frame extraction."
+                ),
+                manual_input_placeholder=r"D:\path\to\input.mp4",
+                examples=cli_examples_by_mode["regular"],
+            )
+            build_cli_export_tab(
+                tab_label="MatAnyone backend",
+                source_mode_value="matanyone_backend",
+                description=(
+                    "Run a regular input through the MatAnyone backend from this app. "
+                    "Use this tab when you want interactive point settings and MatAnyone runtime controls."
+                ),
+                manual_input_placeholder=r"D:\path\to\input.mp4",
+                examples=cli_examples_by_mode["matanyone_backend"],
+                show_matanyone_settings=True,
+            )
+            build_cli_export_tab(
+                tab_label="MatAnyone fg+alpha pair",
+                source_mode_value="matanyone_pair",
+                description=(
+                    "Convert an existing MatAnyone foreground/alpha pair into webp, gif, png, mp4, or webm. "
+                    "You can point this tab at a *_fg.mp4 file, a matching alpha file, or a folder that contains the pair."
+                ),
+                manual_input_placeholder=r"D:\path\to\clip_fg.mp4 or D:\path\to\MatAnyone_dir",
+                examples=cli_examples_by_mode["matanyone_pair"],
+                show_alpha_inputs=True,
+            )
 
         demo.queue()
         demo.launch(

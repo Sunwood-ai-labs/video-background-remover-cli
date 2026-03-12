@@ -26,14 +26,20 @@ pipx install video-background-remover
 ## 💡 Usage
 
 ```bash
-video-background-remover INPUT OUTPUT [options]
+video-background-remover INPUT [OUTPUT] [options]
 ```
+
+If `OUTPUT` is omitted, the CLI auto-creates `./output/<input-file-name>_<timestamp>/` and saves the result there using a name derived from the input file.
 
 Examples:
 
 ```bash
-video-background-remover input.mp4 output.mp4 --bg-color white
+video-background-remover input.mp4 --bg-color white
+video-background-remover input.mov --format mp4 --bg-color white
+video-background-remover input.mp4 --size 300x300 --bg-color white
+video-background-remover input.mp4 --interval 1 --format webp --size 300x300
 video-background-remover input.mp4 output/frames --interval 1 --format webp
+video-background-remover input.mp4 --animated webp --size 300x300
 video-background-remover input.mp4 output/anim.webp --animated webp --webp-fps 10
 python -m video_background_remover_cli input.mp4 output.gif --animated gif
 ```

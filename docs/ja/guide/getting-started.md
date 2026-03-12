@@ -1,10 +1,10 @@
 # はじめに
 
-## 必要な環境
+## 必要環境
 
 - Python 3.10 以上
-- FFmpeg は**不要**です
-- AI モデルは初回実行時に自動でダウンロードされます
+- FFmpeg は不要
+- モデルは初回実行時に自動でダウンロードされます
 
 ## インストール
 
@@ -22,33 +22,44 @@ uv sync
 
 ## クイックスタート
 
-### 1. 背景を白で埋めた動画を出力
+### 白背景の動画を書き出す
 
 ```bash
-python main.py assets/onizuka_idle_motion.mp4 output/output_white.mp4 --bg-color white
+python main.py assets/onizuka_idle_motion.mp4 --bg-color white
 ```
 
-### 2. 透過付きアニメーション WebP を出力
+### 透過付きアニメーション WebP を書き出す
 
 ```bash
-python main.py assets/onizuka_idle_motion.mp4 output/output_animated.webp --animated webp --webp-fps 10
+python main.py assets/onizuka_idle_motion.mp4 --animated webp --webp-fps 10
 ```
 
-### 3. 1 秒ごとに透過フレームを書き出し
+### 1秒ごとに透過フレームを書き出す
 
 ```bash
-python main.py assets/onizuka_idle_motion.mp4 output/frames --interval 1 --format webp
+python main.py assets/onizuka_idle_motion.mp4 --interval 1 --format webp
 ```
 
-## 基本的な使い方
+### MP4 縺ｮ蜃ｺ蜉帙Δ繝ｼ繝峨ｒ譌･譎る俣縺吶ｋ
 
 ```bash
-python main.py INPUT OUTPUT [options]
+python main.py assets/onizuka_idle_motion.mp4 --format mp4 --bg-color white
 ```
 
-| 引数 | 説明 |
-| --- | --- |
-| `INPUT` | 入力動画ファイルのパス |
-| `OUTPUT` | 出力ファイルまたはディレクトリのパス |
+### `300x300` 縺ｫ繝ｪ繧ｵ繧､繧ｺ縺励※蜃ｺ蜉帙☆繧・
 
-オプションの全一覧は[使い方](./usage)のページをご覧ください。
+```bash
+python main.py assets/onizuka_idle_motion.mp4 --animated webp --size 300x300
+```
+
+### MatAnyone の前景動画 + マスク動画から透過 WebP を作る
+
+```bash
+python main.py assets/MatAnyone --matanyone output/matanyone.webp
+```
+
+### MatAnyone の軽量プレビューを作る
+
+```bash
+python main.py assets/MatAnyone --matanyone output/matanyone_5fps_300.webp --webp-fps 5 --size 300x300
+```

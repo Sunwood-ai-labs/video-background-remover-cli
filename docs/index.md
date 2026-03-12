@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Video Background Remover CLI
   text: Remove video backgrounds with ease
-  tagline: A Python CLI tool powered by rembg and OpenCV for background removal from videos
+  tagline: A Python CLI tool powered by rembg and OpenCV for background removal, transparent animation export, and MatAnyone mask-based compositing
   image:
     src: /media/output_animated.webp
     alt: Animated transparent WebP output
@@ -17,25 +17,29 @@ hero:
       link: https://github.com/Sunwood-ai-labs/video-background-remover-cli
 
 features:
-  - icon: "🎬"
-    title: Full Video Export
-    details: Split a video into frames, remove the background, and rebuild it as a video.
+  - icon: "🎞️"
+    title: "Full Video Export"
+    details: "Split a video into frames, remove the background, and rebuild it as a regular video."
   - icon: "🧩"
-    title: Transparent Frame Export
-    details: Export transparent WebP / PNG frames at fixed intervals.
+    title: "Transparent Frames"
+    details: "Export transparent WebP or PNG frames at fixed intervals."
   - icon: "✨"
-    title: Animated WebP / GIF
-    details: Generate transparent animated WebP or GIF files directly from your video.
-  - icon: "🖼️"
-    title: Background Replacement
-    details: Replace the removed background with a solid color or a custom background image.
+    title: "Animated WebP and GIF"
+    details: "Generate looping transparent WebP or GIF outputs directly from video."
+  - icon: "🫥"
+    title: "MatAnyone Pair Support"
+    details: "Combine `*_fg.*` and `*_alpha.*` videos into transparent WebP or GIF outputs."
+  - icon: "🧼"
+    title: "Cleaner Edges"
+    details: "Remove baked green matte contamination from semi-transparent MatAnyone edges before export."
   - icon: "🤖"
-    title: Multiple AI Models
-    details: Switch between isnet-general-use, u2net, u2netp, u2net_human_seg, and silueta.
-  - icon: "⚙️"
-    title: No FFmpeg Required
-    details: All processing is done with Python and the bundled libraries.
+    title: "Multiple AI Models"
+    details: "Switch between isnet-general-use, u2net, u2netp, u2net_human_seg, and silueta."
 ---
+
+## Latest Additions
+
+The documentation now includes timestamped auto-output folders, an explicit `--format mp4` mode, and a shared `--size WIDTHxHEIGHT` option across video, frame, and animated exports.
 
 ## Latest Experiment
 

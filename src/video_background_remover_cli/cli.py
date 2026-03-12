@@ -302,6 +302,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum frames for animated output",
     )
     parser.add_argument(
+        "--bounce",
+        action="store_true",
+        help=(
+            "Create a ping-pong (bounce) loop by adding reversed frames at the end. "
+            "This creates a seamless loop animation."
+        ),
+    )
+    parser.add_argument(
         "--no-bg-removal",
         action="store_true",
         help=(

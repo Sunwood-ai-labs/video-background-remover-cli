@@ -1197,8 +1197,13 @@ class VideoBackgroundRemover:
         format: str = "webp",
         output_size: tuple[int, int] | None = None,
         corner_radius: int = 0,
+        bounce: bool = False,
     ) -> None:
-        """Convert a MatAnyone foreground+alpha pair into animated WebP or GIF."""
+        """Convert a MatAnyone foreground+alpha pair into animated WebP or GIF.
+
+        Args:
+            bounce: If True, add reversed frames at the end for ping-pong loop effect.
+        """
         self._normalize_corner_radius(corner_radius)
         frames_output_dir = self._prepare_animation_frames_dir(output_path)
         print(f"Saving processed frames to {frames_output_dir}")
@@ -1214,6 +1219,13 @@ class VideoBackgroundRemover:
             self._apply_corner_radius(frame, corner_radius=corner_radius)
             for frame in self._load_rgba_frames_as_pil(frame_paths)
         ]
+
+        # Add bounce effect (ping-pong loop)
+        if bounce and len(frames) > 1:
+            print(f"Adding bounce effect (ping-pong loop)...")
+            frames = frames + frames[-2:0:-1]  # Reverse excluding first and last
+            print(f"Total frames after bounce: {len(frames)}")
+
         duration_ms = int(1000 / output_fps)
         format_upper = format.upper()
         print(f"Saving {len(frames)} frames as animated {format_upper}...")

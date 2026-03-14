@@ -2260,11 +2260,13 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                 label=_ui_text(default_language, "cli_export_outputs_label"),
                 lines=6,
                 interactive=False,
+                elem_classes=["vbr-output-box"],
             )
             cli_export_status = gr.Textbox(
                 label=_ui_text(default_language, "cli_export_status_label"),
                 lines=6,
                 value=_ui_text(default_language, "cli_idle_status"),
+                elem_classes=["vbr-status-box"],
             )
             register_language_target(
                 cli_run_button,
@@ -2344,44 +2346,106 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             )
             gr.Examples(examples=examples, inputs=example_inputs)
 
+    theme = gr.themes.Soft(
+        primary_hue="orange",
+        secondary_hue="amber",
+        neutral_hue="stone",
+    )
+
     css = """
-    .gradio-container {max-width: 1280px !important; margin: 0 auto;}
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(245, 158, 11, 0.08), transparent 30%),
+        linear-gradient(180deg, #fffdf9 0%, #f8f5ef 100%);
+      font-family: "Segoe UI Variable Text", "Yu Gothic UI", "Segoe UI", sans-serif;
+    }
+    .gradio-container {
+      max-width: 1280px !important;
+      margin: 0 auto;
+      padding-bottom: 40px !important;
+    }
+    .gradio-container .block.hide-container {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+    .vbr-hero {
+      margin-bottom: 0.9rem;
+      padding: 24px 26px !important;
+      border-radius: 28px !important;
+      border: 1px solid rgba(217, 119, 6, 0.18) !important;
+      background: linear-gradient(135deg, rgba(255, 252, 247, 0.98) 0%, rgba(255, 247, 237, 0.95) 100%) !important;
+      box-shadow: 0 18px 40px rgba(28, 25, 23, 0.06);
+    }
+    .vbr-hero-copy,
+    .vbr-mission {
+      margin-bottom: 0.55rem;
+      padding: 0 4px;
+    }
+    .vbr-device-hint {
+      margin-bottom: 0.9rem;
+    }
+    .vbr-device-hint .prose {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(214, 211, 209, 0.9);
+      background: rgba(255, 255, 255, 0.78);
+    }
+    .vbr-language-switch {
+      margin: 0.85rem 0 1.2rem;
+    }
     .vbr-title {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 24px;
       flex-wrap: wrap;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.15rem;
     }
     .vbr-title-copy {
-      flex: 1 1 320px;
-      min-width: 240px;
+      flex: 1 1 360px;
+      min-width: 250px;
     }
-    .vbr-title h1 {margin-bottom: 0.25rem; font-size: 2.5rem;}
+    .vbr-title h1 {
+      margin: 0;
+      font-size: clamp(2.3rem, 4vw, 3.3rem);
+      line-height: 1.02;
+      letter-spacing: -0.05em;
+    }
     .vbr-title-preview {
       flex: 0 0 auto;
-      width: min(260px, 100%);
-      border-radius: 18px;
+      width: min(250px, 100%);
+      padding: 8px;
+      border-radius: 24px;
       overflow: hidden;
-      background: #eef2f7;
-      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
-      border: 1px solid #e5e7eb;
+      background: rgba(255, 255, 255, 0.86);
+      border: 1px solid rgba(217, 119, 6, 0.16);
+      box-shadow: 0 14px 30px rgba(28, 25, 23, 0.07);
       display: block;
     }
     .vbr-title-preview img {
       width: 100%;
-      max-height: 160px;
+      max-height: 170px;
       object-fit: cover;
+      border-radius: 16px;
       display: block;
     }
-    .vbr-hint {color: #4b5563; font-size: 0.95rem;}
+    .vbr-info-box textarea,
+    .vbr-status-box textarea,
+    .vbr-output-box textarea {
+      background: rgba(255, 252, 247, 0.88) !important;
+    }
+    .vbr-status-box textarea {
+      border-color: rgba(217, 119, 6, 0.22) !important;
+    }
     .ma2-preview-card {
-      border: 1px solid #e5e7eb;
-      border-radius: 18px;
+      border: 1px solid rgba(217, 119, 6, 0.14);
+      border-radius: 22px;
       padding: 16px;
-      background: linear-gradient(180deg, #fffdf8 0%, #f8fafc 100%);
-      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+      background: linear-gradient(180deg, #fffdf9 0%, #fff7ed 100%);
+      box-shadow: 0 14px 28px rgba(28, 25, 23, 0.05);
     }
     .ma2-preview-title {
       font-size: 1rem;
@@ -2393,12 +2457,12 @@ def _launch_in_process(args: argparse.Namespace) -> int:
       max-height: 320px;
       object-fit: contain;
       border-radius: 14px;
-      background: #eef2f7;
+      background: #fffaf3;
       display: block;
     }
     .ma2-preview-name {
       margin-top: 12px;
-      color: #475569;
+      color: #57534e;
       font-size: 0.92rem;
       word-break: break-all;
     }
@@ -2409,10 +2473,22 @@ def _launch_in_process(args: argparse.Namespace) -> int:
       border-radius: 999px;
       text-decoration: none;
       font-weight: 700;
-      background: #111827;
-      color: #ffffff !important;
+      background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+      color: #fff !important;
+      box-shadow: 0 10px 20px rgba(234, 88, 12, 0.18);
+    }
+    .gradio-container .gallery {
+      gap: 12px !important;
+    }
+    .gradio-container .gallery-item {
+      min-height: 90px;
+      border-radius: 18px !important;
+      box-shadow: 0 10px 18px rgba(28, 25, 23, 0.05);
     }
     @media (max-width: 720px) {
+      .gradio-container {
+        padding-bottom: 28px !important;
+      }
       .vbr-title-preview {
         width: 100%;
       }
@@ -2422,23 +2498,31 @@ def _launch_in_process(args: argparse.Namespace) -> int:
     }
     """
 
-    with gr.Blocks(title=_ui_text(default_language, "app_title")) as demo:
-        app_title_html = gr.HTML(_build_app_title_html(default_language))
-        app_summary_markdown = gr.Markdown(_ui_text(default_language, "app_summary"))
+    with gr.Blocks(title=_ui_text(default_language, "app_title"), theme=theme) as demo:
+        app_title_html = gr.HTML(_build_app_title_html(default_language), elem_classes=["vbr-hero"])
+        app_summary_markdown = gr.Markdown(
+            _ui_text(default_language, "app_summary"),
+            elem_classes=["vbr-hero-copy"],
+        )
         device_hint_markdown = gr.Markdown(
             _build_device_hint_html(
                 device_name,
                 sam_model_type,
                 results_root,
                 default_language,
-            )
+            ),
+            elem_classes=["vbr-device-hint"],
         )
-        mission_markdown = gr.Markdown(_ui_text(default_language, "mission"))
+        mission_markdown = gr.Markdown(
+            _ui_text(default_language, "mission"),
+            elem_classes=["vbr-mission"],
+        )
         with gr.Row():
             ui_language = gr.Radio(
                 choices=LANGUAGE_CHOICES,
                 value=default_language,
                 label="Language / 言語",
+                elem_classes=["vbr-language-switch"],
             )
         register_language_target(
             app_title_html,
@@ -2496,16 +2580,19 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                             label=_ui_text(default_language, "video_info_label"),
                             lines=4,
                             value=_ui_text(default_language, "load_mp4_info"),
+                            elem_classes=["vbr-info-box"],
                         )
                         mp4_converter_resize_preview = gr.Textbox(
                             label=_ui_text(default_language, "resize_preview_label"),
                             lines=2,
                             value=_build_resize_ratio_text(None, 1.0, default_language),
+                            elem_classes=["vbr-info-box"],
                         )
                         mp4_converter_status = gr.Textbox(
                             label=_ui_text(default_language, "workflow_status_label"),
                             lines=7,
                             value=_ui_text(default_language, "mp4_idle_status"),
+                            elem_classes=["vbr-status-box"],
                         )
                 register_language_target(
                     mp4_step1_markdown,
@@ -2850,6 +2937,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                                     ma2_video_info = gr.Textbox(
                                         label=_ui_text(default_language, "video_info_label"),
                                         value=_ui_text(default_language, "default_video_info"),
+                                        elem_classes=["vbr-info-box"],
                                     )
                                     ma2_video_template_frame = gr.Image(
                                         type="pil",
@@ -2916,6 +3004,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                                 label=_ui_text(default_language, "workflow_status_label"),
                                 lines=6,
                                 value=_ui_text(default_language, "matanyone_video_idle_status"),
+                                elem_classes=["vbr-status-box"],
                             )
 
                             gr.Markdown("---")
@@ -3320,7 +3409,11 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                                     ma2_image_input = gr.Image(label=_ui_text(default_language, "input_image_label"))
                                     ma2_load_image_button = gr.Button(value=_ui_text(default_language, "load_image_button"), interactive=True)
                                 with gr.Column(scale=2):
-                                    ma2_image_info = gr.Textbox(label=_ui_text(default_language, "image_info_label"), visible=False)
+                                    ma2_image_info = gr.Textbox(
+                                        label=_ui_text(default_language, "image_info_label"),
+                                        visible=False,
+                                        elem_classes=["vbr-info-box"],
+                                    )
                                     ma2_image_template_frame = gr.Image(
                                         type="pil",
                                         label=_ui_text(default_language, "interactive_frame_label"),

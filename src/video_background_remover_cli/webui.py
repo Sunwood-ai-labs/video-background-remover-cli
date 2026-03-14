@@ -1979,19 +1979,29 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             f"Results: <code>{results_root}</code></div>"
         )
 
-        with gr.Tabs():
+        gr.Markdown(
+            "### Mission\n"
+            "This app is focused on one primary job: remove the background from a video and export `webp` / `gif`.\n\n"
+            "Use `Main Workflow > Video` for the default MatAnyone flow. The other tabs are kept for advanced or legacy cases."
+        )
+
+        with gr.Tabs(selected="main_workflow"):
             build_cli_export_tab(
-                tab_label="rembg",
+                tab_label="Advanced rembg",
                 source_mode_value="regular",
                 description=(
-                    "Use the current rembg-based CLI features from the browser. "
-                    "This tab covers standard video export, animated webp/gif, and frame extraction."
+                    "Advanced rembg-based export tools. "
+                    "Use this only when you specifically want the rembg path instead of the main MatAnyone workflow."
                 ),
                 manual_input_placeholder=r"D:\path\to\input.mp4",
                 examples=cli_examples_by_mode["regular"],
             )
 
-            with gr.TabItem("MatAnyone"):
+            with gr.TabItem("Legacy MatAnyone", id="legacy_matanyone"):
+                gr.Markdown(
+                    "### Legacy Interactive Workflow\n"
+                    "This tab is kept for compatibility. For the main video background-removal flow, use `Main Workflow > Video`."
+                )
                 if tutorial_single.exists() or tutorial_multi.exists():
                     with gr.Accordion("Tutorial Videos", open=False):
                         with gr.Row():
@@ -2242,13 +2252,20 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                             gr.Examples(examples=image_examples, inputs=[image_input])
 
             # ========== MatAnyone2 Tab (Pure MatAnyone app.py implementation) ==========
-            with gr.TabItem("MatAnyone2"):
-                gr.Markdown("### Pure MatAnyone2 Interface (from MatAnyone app.py)")
-                gr.Markdown("This tab uses the original MatAnyone implementation with `generate_video_from_frames`.")
+            with gr.TabItem("Main Workflow", id="main_workflow"):
+                gr.Markdown("### Main Workflow")
+                gr.Markdown(
+                    "Use this tab for the primary app mission: interactive MatAnyone video background removal "
+                    "followed by animated `webp` / `gif` export."
+                )
+                gr.Markdown(
+                    "The `Video` sub-tab is the main route. The other sub-tabs are advanced helpers for image work, "
+                    "batch backend runs, or converting an existing foreground/alpha pair."
+                )
 
-                with gr.Tabs():
+                with gr.Tabs(selected="main_video_workflow"):
                     # Video Tab
-                    with gr.TabItem("Video"):
+                    with gr.TabItem("Video", id="main_video_workflow"):
                         ma2_video_click_state = gr.State([[], []])
                         ma2_video_interactive_state = gr.State({
                             "inference_times": 0,
@@ -2634,7 +2651,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                             gr.Examples(examples=video_examples, inputs=[ma2_video_input])
 
                     # Image Tab
-                    with gr.TabItem("Image"):
+                    with gr.TabItem("Image (Advanced)"):
                         ma2_image_click_state = gr.State([[], []])
                         ma2_image_interactive_state = gr.State({
                             "inference_times": 0,
@@ -2930,22 +2947,22 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             # ========== End MatAnyone2 Tab ==========
 
                     build_cli_export_tab(
-                        tab_label="backend",
+                        tab_label="Advanced backend",
                         source_mode_value="matanyone_backend",
                         description=(
-                            "Run a regular input through the MatAnyone backend from this app. "
-                            "Use this tab when you want interactive point settings and MatAnyone runtime controls."
+                            "Advanced batch export for running a regular input through the MatAnyone backend. "
+                            "Use this when you need backend settings directly instead of the main interactive video flow."
                         ),
                         manual_input_placeholder=r"D:\path\to\input.mp4",
                         examples=cli_examples_by_mode["matanyone_backend"],
                         show_matanyone_settings=True,
                     )
                     build_cli_export_tab(
-                        tab_label="fg+alpha pair",
+                        tab_label="Advanced fg+alpha pair",
                         source_mode_value="matanyone_pair",
                         description=(
-                            "Convert an existing MatAnyone foreground/alpha pair into webp, gif, png, mp4, or webm. "
-                            "You can point this tab at a *_fg.mp4 file, a matching alpha file, or a folder that contains the pair."
+                            "Advanced converter for an existing MatAnyone foreground/alpha pair. "
+                            "Use this when you already have `*_fg.mp4` and `*_alpha.mp4` and only need export rendering."
                         ),
                         manual_input_placeholder=r"D:\path\to\clip_fg.mp4 or D:\path\to\MatAnyone_dir",
                         examples=cli_examples_by_mode["matanyone_pair"],

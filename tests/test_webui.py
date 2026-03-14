@@ -12,9 +12,11 @@ if str(SRC) not in sys.path:
 from video_background_remover_cli.webui import (
     INTERNAL_LAUNCH_FLAG,
     _build_resize_ratio_text,
+    _build_video_info_text,
     _build_cli_output_target,
     _compute_scaled_dimensions,
     _parse_points_text,
+    _ui_text,
     build_external_launch_command,
     build_pythonpath,
 )
@@ -104,12 +106,45 @@ class CliHelperTests(unittest.TestCase):
         text = _build_resize_ratio_text(
             {"width": 1280, "height": 720},
             0.5,
+            "en",
         )
 
         self.assertEqual(
             text,
             "Resize ratio 0.50 -> 640 x 360 (from 1280 x 720)",
         )
+
+    def test_build_resize_ratio_text_reports_scaled_size_in_japanese(self) -> None:
+        text = _build_resize_ratio_text(
+            {"width": 1280, "height": 720},
+            0.5,
+            "ja",
+        )
+
+        self.assertEqual(
+            text,
+            "リサイズ比 0.50 -> 640 x 360 （元: 1280 x 720）",
+        )
+
+    def test_build_video_info_text_uses_requested_language(self) -> None:
+        text = _build_video_info_text(
+            {
+                "width": 640,
+                "height": 360,
+                "frame_count": 24,
+                "fps": 12.0,
+                "duration": 2.0,
+            },
+            "en",
+        )
+
+        self.assertEqual(
+            text,
+            "Resolution: 640 x 360\nFrames: 24\nSource FPS: 12.00\nDuration: 2.00s",
+        )
+
+    def test_ui_text_falls_back_to_default_language_for_unknown_language(self) -> None:
+        self.assertEqual(_ui_text("xx", "app_title"), _ui_text("ja", "app_title"))
 
 
 class WebUiExampleTests(unittest.TestCase):

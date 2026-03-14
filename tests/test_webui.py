@@ -11,7 +11,9 @@ if str(SRC) not in sys.path:
 
 from video_background_remover_cli.webui import (
     INTERNAL_LAUNCH_FLAG,
+    _build_resize_ratio_text,
     _build_cli_output_target,
+    _compute_scaled_dimensions,
     _parse_points_text,
     build_external_launch_command,
     build_pythonpath,
@@ -94,6 +96,20 @@ class CliHelperTests(unittest.TestCase):
         )
 
         self.assertEqual(target, str(Path("output") / "case" / "clip_output.webm"))
+
+    def test_compute_scaled_dimensions_applies_ratio(self) -> None:
+        self.assertEqual(_compute_scaled_dimensions(1920, 1080, 0.5), (960, 540))
+
+    def test_build_resize_ratio_text_reports_scaled_size(self) -> None:
+        text = _build_resize_ratio_text(
+            {"width": 1280, "height": 720},
+            0.5,
+        )
+
+        self.assertEqual(
+            text,
+            "Resize ratio 0.50 -> 640 x 360 (from 1280 x 720)",
+        )
 
 
 class WebUiExampleTests(unittest.TestCase):

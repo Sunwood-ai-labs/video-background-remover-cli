@@ -370,6 +370,84 @@ def _build_cli_output_target(
     return str(base_dir / f"{stem}_output.{extension}")
 
 
+def _read_video_metadata(video_path: str) -> dict[str, Any]:
+    import cv2
+
+    capture = cv2.VideoCapture(video_path)
+    if not capture.isOpened():
+        raise ValueError(f"Cannot open video: {video_path}")
+
+    try:
+        fps = float(capture.get(cv2.CAP_PROP_FPS) or 0.0)
+        frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+        height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+    finally:
+        capture.release()
+
+    duration = frame_count / fps if fps > 0 else 0.0
+    return {
+        "video_path": str(Path(video_path)),
+        "fps": fps,
+        "frame_count": frame_count,
+        "duration": duration,
+        "width": width,
+        "height": height,
+    }
+
+
+def _normalize_resize_ratio(value: float | int | None) -> float:
+    if value in (None, ""):
+        return 1.0
+    return max(0.05, float(value))
+
+
+def _compute_scaled_dimensions(
+    width: int,
+    height: int,
+    resize_ratio: float | int | None,
+) -> tuple[int, int]:
+    ratio = _normalize_resize_ratio(resize_ratio)
+    return (
+        max(1, int(round(width * ratio))),
+        max(1, int(round(height * ratio))),
+    )
+
+
+def _build_video_info_text(metadata: dict[str, Any]) -> str:
+    width = int(metadata.get("width") or 0)
+    height = int(metadata.get("height") or 0)
+    frame_count = int(metadata.get("frame_count") or 0)
+    fps = float(metadata.get("fps") or 0.0)
+    duration = float(metadata.get("duration") or 0.0)
+    return (
+        f"Resolution: {width} x {height}\n"
+        f"Frames: {frame_count}\n"
+        f"Source FPS: {fps:.2f}\n"
+        f"Duration: {duration:.2f}s"
+    )
+
+
+def _build_resize_ratio_text(
+    metadata: dict[str, Any] | None,
+    resize_ratio: float | int | None,
+) -> str:
+    if not metadata:
+        return "Resize ratio 1.00 keeps the original size. Load a video to preview the resized dimensions."
+
+    width = int(metadata.get("width") or 0)
+    height = int(metadata.get("height") or 0)
+    if width <= 0 or height <= 0:
+        return "Load a video to preview the resized dimensions."
+
+    ratio = _normalize_resize_ratio(resize_ratio)
+    resized_width, resized_height = _compute_scaled_dimensions(width, height, ratio)
+    return (
+        f"Resize ratio {ratio:.2f} -> {resized_width} x {resized_height} "
+        f"(from {width} x {height})"
+    )
+
+
 def _launch_in_process(args: argparse.Namespace) -> int:
     """Run the actual Gradio app inside a MatAnyone-capable Python environment."""
     matanyone_root = resolve_matanyone_root(args.matanyone_root)
@@ -903,6 +981,161 @@ def _launch_in_process(args: argparse.Namespace) -> int:
 
     # ========== End MatAnyone2 Tab Functions ==========
 
+    def restart_mp4_converter():
+        return (
+            {},
+            gr.update(
+                value="Load an mp4 to inspect fps and source size.",
+                visible=True,
+            ),
+            gr.update(
+                value=_build_resize_ratio_text(None, 1.0),
+                visible=True,
+            ),
+            gr.update(value="", visible=False),
+            gr.update(value="", visible=False),
+            gr.update(
+                value=(
+                    "Idle. Upload an mp4, tune FPS and resize ratio, then convert it "
+                    "to animated WebP/GIF."
+                )
+            ),
+            gr.update(interactive=False),
+        )
+
+    def load_mp4_converter_video(
+        video_input: str,
+        resize_ratio: float,
+        progress=gr.Progress(track_tqdm=True),
+    ):
+        if not video_input:
+            raise gr.Error("Upload an mp4 first.")
+
+        _push_progress(progress, 0.1, "Reading video metadata...")
+        try:
+            metadata = _read_video_metadata(video_input)
+        except ValueError as exc:
+            raise gr.Error(str(exc)) from exc
+        _push_progress(progress, 1.0, "Video ready")
+        return (
+            metadata,
+            gr.update(value=_build_video_info_text(metadata), visible=True),
+            gr.update(
+                value=_build_resize_ratio_text(metadata, resize_ratio),
+                visible=True,
+            ),
+            gr.update(value="", visible=False),
+            gr.update(value="", visible=False),
+            gr.update(
+                value=(
+                    "Video ready. Adjust the export settings, then click Convert MP4 "
+                    "to generate animated WebP/GIF downloads."
+                )
+            ),
+            gr.update(interactive=True),
+        )
+
+    def update_mp4_resize_preview(metadata: dict[str, Any], resize_ratio: float):
+        return gr.update(
+            value=_build_resize_ratio_text(metadata, resize_ratio),
+            visible=True,
+        )
+
+    def convert_mp4_to_animated(
+        video_input: str,
+        metadata: dict[str, Any],
+        export_fps: int | float,
+        resize_ratio: float,
+        max_frames: int | float | None,
+        progress=gr.Progress(track_tqdm=True),
+    ):
+        if not video_input:
+            raise gr.Error("Upload an mp4 first.")
+
+        yield (
+            gr.update(value="", visible=False),
+            gr.update(value="", visible=False),
+            gr.update(value="Preparing direct MP4 conversion..."),
+        )
+
+        if (
+            not metadata
+            or Path(metadata.get("video_path", "")).resolve() != Path(video_input).resolve()
+        ):
+            try:
+                metadata = _read_video_metadata(video_input)
+            except ValueError as exc:
+                raise gr.Error(str(exc)) from exc
+
+        width = int(metadata.get("width") or 0)
+        height = int(metadata.get("height") or 0)
+        output_size = None
+        if width > 0 and height > 0:
+            scaled_width, scaled_height = _compute_scaled_dimensions(
+                width,
+                height,
+                resize_ratio,
+            )
+            if (scaled_width, scaled_height) != (width, height):
+                output_size = (scaled_width, scaled_height)
+
+        format_names = ["webp", "gif"]
+        output_dir = results_root / "mp4_converter" / _timestamp_token()
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_root = output_dir / f"{Path(video_input).stem}_animated"
+        remover = VideoBackgroundRemover()
+        export_fps_value = max(1, int(export_fps or 10))
+        max_frames_value = _safe_max_frames(max_frames)
+
+        for index, format_name in enumerate(format_names):
+            progress_base = 0.1 + index * 0.4
+            _push_progress(
+                progress,
+                progress_base,
+                f"Rendering animated {format_name.upper()}...",
+            )
+            remover.to_animated(
+                video_path=video_input,
+                output_path=str(output_root.with_suffix(f".{format_name}")),
+                fps=export_fps_value,
+                max_frames=max_frames_value,
+                format=format_name,
+                output_size=output_size,
+                remove_background=False,
+            )
+
+        webp_output = str(output_root.with_suffix(".webp"))
+        gif_output = str(output_root.with_suffix(".gif"))
+        resize_text = _build_resize_ratio_text(metadata, resize_ratio)
+        status_lines = [
+            "Done. Direct MP4 conversion finished.",
+            f"Input: {video_input}",
+            "Export type: webp + gif",
+            f"Export FPS: {export_fps_value}",
+            resize_text,
+        ]
+        if max_frames_value is None:
+            status_lines.append("Max frames: all")
+        else:
+            status_lines.append(f"Max frames: {max_frames_value}")
+        if Path(webp_output).exists():
+            status_lines.append(f"WebP: {webp_output}")
+        if Path(gif_output).exists():
+            status_lines.append(f"GIF: {gif_output}")
+
+        _push_progress(progress, 1.0, "Direct MP4 conversion complete")
+        yield (
+            gr.update(
+                value=_build_preview_download_html("Animated WebP", webp_output),
+                visible=Path(webp_output).exists(),
+            ),
+            gr.update(
+                value=_build_preview_download_html("Animated GIF", gif_output),
+                visible=Path(gif_output).exists(),
+            ),
+            gr.update(value="\n".join(status_lines)),
+        )
+
     def run_cli_export(
         source_mode: str,
         upload_input_path: str | None,
@@ -1388,10 +1621,162 @@ def _launch_in_process(args: argparse.Namespace) -> int:
         gr.Markdown(
             "### Mission\n"
             "This app is focused on one primary job: remove the background from a video and export `webp` / `gif`.\n\n"
-            "Use `MatAnyone2 > Video` for the default MatAnyone flow. The other tabs are kept only for advanced cases."
+            "Use `MatAnyone2 > Video` for the default MatAnyone flow. "
+            "Use `MP4 -> WebP/GIF` when you only need a plain animated conversion without matting. "
+            "The other tabs are kept only for advanced cases."
         )
 
         with gr.Tabs(selected="matanyone2"):
+            with gr.TabItem("MP4 -> WebP/GIF", id="mp4_converter"):
+                gr.Markdown("### MP4 -> WebP/GIF")
+                gr.Markdown(
+                    "Upload a regular mp4 and convert it directly into animated `webp` and `gif`. "
+                    "This tab keeps the original video content as-is and skips background removal."
+                )
+
+                mp4_converter_state = gr.State({})
+
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        gr.Markdown("## Step1: Upload mp4")
+                        mp4_converter_input = gr.Video(label="Input MP4")
+                        mp4_converter_load_button = gr.Button(
+                            value="Load Video",
+                            interactive=True,
+                        )
+                    with gr.Column(scale=2):
+                        mp4_converter_info = gr.Textbox(
+                            label="Video Info",
+                            lines=4,
+                            value="Load an mp4 to inspect fps and source size.",
+                        )
+                        mp4_converter_resize_preview = gr.Textbox(
+                            label="Resize Preview",
+                            lines=2,
+                            value=_build_resize_ratio_text(None, 1.0),
+                        )
+                        mp4_converter_status = gr.Textbox(
+                            label="Workflow Status",
+                            lines=7,
+                            value=(
+                                "Idle. Upload an mp4, tune FPS and resize ratio, then convert it "
+                                "to animated WebP and GIF."
+                            ),
+                        )
+
+                gr.Markdown("---")
+                gr.Markdown("## Step2: Export Settings")
+                with gr.Accordion("Animated Output Settings", open=True):
+                    gr.Markdown(
+                        "These settings apply to direct mp4 conversion. "
+                        "This tab always generates both `webp` and `gif`. "
+                        "Use a lower FPS and smaller resize ratio for lighter files."
+                    )
+                    with gr.Row():
+                        gr.Textbox(
+                            value="Always generates: Animated WebP + GIF",
+                            label="Export Output",
+                            interactive=False,
+                        )
+                        mp4_converter_fps = gr.Slider(
+                            minimum=1,
+                            maximum=30,
+                            step=1,
+                            value=10,
+                            label="Export FPS",
+                            info="Lower FPS = smaller file size",
+                        )
+                        mp4_converter_resize_ratio = gr.Slider(
+                            minimum=0.1,
+                            maximum=1.0,
+                            step=0.05,
+                            value=1.0,
+                            label="Resize Ratio",
+                            info="1.00 = original size, 0.50 = half size",
+                        )
+                    with gr.Row():
+                        mp4_converter_max_frames = gr.Number(
+                            value=150,
+                            precision=0,
+                            label="Max Frames (0 = all)",
+                        )
+                        mp4_converter_convert_button = gr.Button(
+                            value="Convert MP4",
+                            interactive=False,
+                            variant="primary",
+                        )
+
+                gr.Markdown("---")
+                gr.Markdown("## Step3: Preview & Download")
+                gr.Markdown(
+                    "After conversion finishes, the requested animated files appear here with previews "
+                    "and direct download buttons."
+                )
+                with gr.Row():
+                    mp4_converter_webp_preview = gr.HTML(visible=False)
+                    mp4_converter_gif_preview = gr.HTML(visible=False)
+
+                mp4_converter_reset_outputs = [
+                    mp4_converter_state,
+                    mp4_converter_info,
+                    mp4_converter_resize_preview,
+                    mp4_converter_webp_preview,
+                    mp4_converter_gif_preview,
+                    mp4_converter_status,
+                    mp4_converter_convert_button,
+                ]
+
+                mp4_converter_load_button.click(
+                    fn=load_mp4_converter_video,
+                    inputs=[mp4_converter_input, mp4_converter_resize_ratio],
+                    outputs=mp4_converter_reset_outputs,
+                    show_progress="full",
+                )
+
+                mp4_converter_resize_ratio.change(
+                    fn=update_mp4_resize_preview,
+                    inputs=[mp4_converter_state, mp4_converter_resize_ratio],
+                    outputs=[mp4_converter_resize_preview],
+                    queue=False,
+                    show_progress=False,
+                )
+
+                mp4_converter_convert_button.click(
+                    fn=convert_mp4_to_animated,
+                    inputs=[
+                        mp4_converter_input,
+                        mp4_converter_state,
+                        mp4_converter_fps,
+                        mp4_converter_resize_ratio,
+                        mp4_converter_max_frames,
+                    ],
+                    outputs=[
+                        mp4_converter_webp_preview,
+                        mp4_converter_gif_preview,
+                        mp4_converter_status,
+                    ],
+                    show_progress="full",
+                )
+
+                mp4_converter_input.change(
+                    fn=restart_mp4_converter,
+                    inputs=[],
+                    outputs=mp4_converter_reset_outputs,
+                    queue=False,
+                    show_progress=False,
+                )
+
+                mp4_converter_input.clear(
+                    fn=restart_mp4_converter,
+                    inputs=[],
+                    outputs=mp4_converter_reset_outputs,
+                    queue=False,
+                    show_progress=False,
+                )
+
+                if video_examples:
+                    gr.Examples(examples=video_examples, inputs=[mp4_converter_input])
+
             build_cli_export_tab(
                 tab_label="Advanced rembg",
                 source_mode_value="regular",

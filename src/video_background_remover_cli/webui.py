@@ -2871,23 +2871,6 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                                         )
 
                             gr.Markdown("---")
-
-                            with gr.Row():
-                                with gr.Column(scale=2):
-                                    ma2_video_foreground_output = gr.Video(
-                                        label=_ui_text(default_language, "foreground_output_label"), visible=False
-                                    )
-                                with gr.Column(scale=2):
-                                    ma2_video_alpha_output = gr.Video(
-                                        label=_ui_text(default_language, "alpha_output_label"), visible=False
-                                    )
-                            ma2_video_status = gr.Textbox(
-                                label=_ui_text(default_language, "workflow_status_label"),
-                                lines=6,
-                                value=_ui_text(default_language, "matanyone_video_idle_status"),
-                            )
-
-                            gr.Markdown("---")
                             with gr.Accordion(_ui_text(default_language, "animated_output_settings"), open=True) as ma2_animated_output_settings:
                                 ma2_video_settings_hint_markdown = gr.Markdown(
                                     _ui_text(default_language, "matanyone_video_settings_hint")
@@ -2917,6 +2900,23 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                                         info=_ui_text(default_language, "info_bounce_loop"),
                                         interactive=True,
                                     )
+
+                            gr.Markdown("---")
+
+                            with gr.Row():
+                                with gr.Column(scale=2):
+                                    ma2_video_foreground_output = gr.Video(
+                                        label=_ui_text(default_language, "foreground_output_label"), visible=False
+                                    )
+                                with gr.Column(scale=2):
+                                    ma2_video_alpha_output = gr.Video(
+                                        label=_ui_text(default_language, "alpha_output_label"), visible=False
+                                    )
+                            ma2_video_status = gr.Textbox(
+                                label=_ui_text(default_language, "workflow_status_label"),
+                                lines=6,
+                                value=_ui_text(default_language, "matanyone_video_idle_status"),
+                            )
 
                             gr.Markdown("---")
                             ma2_step3_markdown = gr.Markdown(_ui_text(default_language, "step3_preview_download"))
@@ -3596,14 +3596,6 @@ def _launch_in_process(args: argparse.Namespace) -> int:
 
             # ========== End MatAnyone2 Tab ==========
 
-                    build_cli_export_tab(
-                        tab_label_key="tab_advanced_backend",
-                        source_mode_value="matanyone_backend",
-                        description_key="advanced_backend_desc",
-                        manual_input_placeholder=r"D:\path\to\input.mp4",
-                        examples=cli_examples_by_mode["matanyone_backend"],
-                        show_matanyone_settings=True,
-                    )
                     build_cli_export_tab(
                         tab_label_key="tab_advanced_pair",
                         source_mode_value="matanyone_pair",

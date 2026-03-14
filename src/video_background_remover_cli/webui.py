@@ -2082,6 +2082,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                 server_name=args.server_name,
                 server_port=args.port,
                 share=args.share,
+                allowed_paths=[str(results_root.resolve())],
                 css=css,
             )
         except KeyboardInterrupt:

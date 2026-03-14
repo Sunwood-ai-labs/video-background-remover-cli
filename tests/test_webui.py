@@ -11,9 +11,11 @@ if str(SRC) not in sys.path:
 
 from video_background_remover_cli.webui import (
     INTERNAL_LAUNCH_FLAG,
+    _build_advanced_rembg_examples,
     _build_resize_ratio_text,
     _build_video_info_text,
     _build_cli_output_target,
+    _collect_existing_example_paths,
     _compute_scaled_dimensions,
     _parse_points_text,
     _ui_text,
@@ -145,6 +147,22 @@ class CliHelperTests(unittest.TestCase):
 
     def test_ui_text_falls_back_to_default_language_for_unknown_language(self) -> None:
         self.assertEqual(_ui_text("xx", "app_title"), _ui_text("ja", "app_title"))
+
+    def test_collect_existing_example_paths_filters_missing_files(self) -> None:
+        paths = _collect_existing_example_paths(
+            ROOT / "assets" / "star-cat2.mp4",
+            ROOT / "assets" / "missing-example.mp4",
+        )
+
+        self.assertEqual(paths, [str((ROOT / "assets" / "star-cat2.mp4").resolve())])
+
+    def test_build_advanced_rembg_examples_match_ui_shape(self) -> None:
+        examples = _build_advanced_rembg_examples(ROOT)
+
+        self.assertTrue(examples)
+        for example in examples:
+            self.assertEqual(len(example), 7)
+            self.assertTrue(Path(example[1]).exists(), example[1])
 
 
 class WebUiExampleTests(unittest.TestCase):

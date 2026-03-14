@@ -39,6 +39,7 @@ from .matanyone_bridge import (
 
 DEFAULT_RESULTS_DIR = Path("output") / "webui"
 INTERNAL_LAUNCH_FLAG = "--_internal-launch"
+APP_HEADER_PREVIEW_URL = "https://raw.githubusercontent.com/Sunwood-ai-labs/video-background-remover-cli/main/example/output_animated.webp"
 DEFAULT_UI_LANGUAGE = "ja"
 LANGUAGE_CHOICES = [("日本語", "ja"), ("English", "en")]
 
@@ -303,7 +304,7 @@ UI_TEXT: dict[str, dict[str, str]] = {
         "background_gray": "Gray",
     },
     "ja": {
-        "app_title": "動画背景削除スタジオ",
+        "app_title": "Video Background Remover Studio",
         "app_summary": (
             "この Gradio アプリは、MatAnyone の Video / Image ワークフローに加えて、"
             "`webp` / `gif` / `png` / `mp4` / `webm` の追加書き出しをまとめて扱えます。"
@@ -320,10 +321,10 @@ UI_TEXT: dict[str, dict[str, str]] = {
             "高度なタブは、細かい書き出し設定が必要な場合のために残しています。"
         ),
         "tab_mp4_converter": "MP4 -> WebP/GIF",
-        "tab_advanced_rembg": "高度な rembg",
+        "tab_advanced_rembg": "Advanced rembg",
         "tab_matanyone2": "MatAnyone2",
-        "tab_advanced_backend": "高度な backend",
-        "tab_advanced_pair": "高度な fg+alpha ペア",
+        "tab_advanced_backend": "Advanced backend",
+        "tab_advanced_pair": "Advanced fg+alpha pair",
         "tab_video": "動画",
         "tab_image_advanced": "画像（詳細）",
         "advanced_rembg_desc": (
@@ -565,7 +566,14 @@ def _ui_text(language: str | None, key: str, **kwargs: Any) -> str:
 def _build_app_title_html(language: str = DEFAULT_UI_LANGUAGE) -> str:
     return (
         "<div class=\"vbr-title\">"
+        "<div class=\"vbr-title-copy\">"
         f"<h1>{html.escape(_ui_text(language, 'app_title'))}</h1>"
+        "</div>"
+        f"<a class=\"vbr-title-preview\" href=\"{html.escape(APP_HEADER_PREVIEW_URL, quote=True)}\" "
+        "target=\"_blank\" rel=\"noopener noreferrer\">"
+        f"<img src=\"{html.escape(APP_HEADER_PREVIEW_URL, quote=True)}\" "
+        "alt=\"Animated output preview\" />"
+        "</a>"
         "</div>"
     )
 
@@ -583,6 +591,36 @@ def _build_device_hint_html(
         sam=sam_model_type,
         results=results_root,
     )
+
+
+def _collect_existing_example_paths(*paths: Path) -> list[str]:
+    return [str(path.resolve()) for path in paths if path.exists()]
+
+
+def _build_advanced_rembg_examples(cwd: Path | None = None) -> list[list[str | None]]:
+    base_dir = (cwd or Path.cwd()).resolve()
+    specs = [
+        ("onizuka_idle_motion.mp4", "animated", "both", "webp"),
+        ("onizuka_walk_motion.mp4", "interval", "webp", "png"),
+        ("onizuka_fire_motion.mp4", "video", "webp", "webp"),
+    ]
+    examples: list[list[str | None]] = []
+    for file_name, export_mode, animated_format, frame_format in specs:
+        path = base_dir / "assets" / file_name
+        if not path.exists():
+            continue
+        examples.append(
+            [
+                None,
+                str(path.resolve()),
+                "",
+                export_mode,
+                "mp4",
+                animated_format,
+                frame_format,
+            ]
+        )
+    return examples
 
 
 def _localized_export_mode_choices(language: str) -> list[tuple[str, str]]:
@@ -1100,8 +1138,14 @@ def _launch_in_process(args: argparse.Namespace) -> int:
     results_root.mkdir(parents=True, exist_ok=True)
     remover = VideoBackgroundRemover()
 
-    local_star_cat_video = (Path.cwd() / "assets" / "star-cat2.mp4").resolve()
-    video_examples = [
+    assets_root = Path.cwd().resolve() / "assets"
+    mp4_converter_examples = _collect_existing_example_paths(
+        assets_root / "star-cat2.mp4",
+        assets_root / "jetclaw2.mp4",
+        assets_root / "onizuka_release_v010_motion.mp4",
+        assets_root / "onizuka_idle_motion.mp4",
+    )
+    matanyone_video_examples = [
         matanyone_root / "hugging_face" / "test_sample" / name
         for name in [
             "test-sample-0-720p.mp4",
@@ -1112,9 +1156,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             "test-sample-5-720p.mp4",
         ]
     ]
-    if local_star_cat_video.exists():
-        video_examples.insert(0, local_star_cat_video)
-    image_examples = [
+    matanyone_image_examples = [
         matanyone_root / "hugging_face" / "test_sample" / name
         for name in [
             "test-sample-0.jpg",
@@ -1123,8 +1165,9 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             "test-sample-3.jpg",
         ]
     ]
-    video_examples = [str(path) for path in video_examples if path.exists()]
-    image_examples = [str(path) for path in image_examples if path.exists()]
+    matanyone_video_examples = [str(path) for path in matanyone_video_examples if path.exists()]
+    matanyone_image_examples = [str(path) for path in matanyone_image_examples if path.exists()]
+    advanced_rembg_examples = _build_advanced_rembg_examples(Path.cwd())
     cli_examples_by_mode = build_cli_examples_by_mode(Path.cwd())
     default_language = DEFAULT_UI_LANGUAGE
     language_update_targets: list[tuple[Any, Any]] = []
@@ -2303,7 +2346,35 @@ def _launch_in_process(args: argparse.Namespace) -> int:
 
     css = """
     .gradio-container {max-width: 1280px !important; margin: 0 auto;}
+    .vbr-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin-bottom: 0.5rem;
+    }
+    .vbr-title-copy {
+      flex: 1 1 320px;
+      min-width: 240px;
+    }
     .vbr-title h1 {margin-bottom: 0.25rem; font-size: 2.5rem;}
+    .vbr-title-preview {
+      flex: 0 0 auto;
+      width: min(260px, 100%);
+      border-radius: 18px;
+      overflow: hidden;
+      background: #eef2f7;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+      border: 1px solid #e5e7eb;
+      display: block;
+    }
+    .vbr-title-preview img {
+      width: 100%;
+      max-height: 160px;
+      object-fit: cover;
+      display: block;
+    }
     .vbr-hint {color: #4b5563; font-size: 0.95rem;}
     .ma2-preview-card {
       border: 1px solid #e5e7eb;
@@ -2340,6 +2411,14 @@ def _launch_in_process(args: argparse.Namespace) -> int:
       font-weight: 700;
       background: #111827;
       color: #ffffff !important;
+    }
+    @media (max-width: 720px) {
+      .vbr-title-preview {
+        width: 100%;
+      }
+      .vbr-title-preview img {
+        max-height: 220px;
+      }
     }
     """
 
@@ -2620,15 +2699,15 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                     show_progress=False,
                 )
 
-                if video_examples:
-                    gr.Examples(examples=video_examples, inputs=[mp4_converter_input])
+                if mp4_converter_examples:
+                    gr.Examples(examples=mp4_converter_examples, inputs=[mp4_converter_input])
 
             build_cli_export_tab(
                 tab_label_key="tab_advanced_rembg",
                 source_mode_value="regular",
                 description_key="advanced_rembg_desc",
                 manual_input_placeholder=r"D:\path\to\input.mp4",
-                examples=cli_examples_by_mode["regular"],
+                examples=advanced_rembg_examples,
             )
 
             # ========== MatAnyone2 Tab (Pure MatAnyone app.py implementation) ==========
@@ -3122,8 +3201,8 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                             outputs=[ma2_video_template_frame, ma2_video_click_state],
                         )
 
-                        if video_examples:
-                            gr.Examples(examples=video_examples, inputs=[ma2_video_input])
+                        if matanyone_video_examples:
+                            gr.Examples(examples=matanyone_video_examples, inputs=[ma2_video_input])
 
                     # Image Tab
                     with gr.TabItem(_ui_text(default_language, "tab_image_advanced")) as matanyone_image_tab:
@@ -3512,8 +3591,8 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                             outputs=[ma2_image_template_frame, ma2_image_click_state],
                         )
 
-                        if image_examples:
-                            gr.Examples(examples=image_examples, inputs=[ma2_image_input])
+                        if matanyone_image_examples:
+                            gr.Examples(examples=matanyone_image_examples, inputs=[ma2_image_input])
 
             # ========== End MatAnyone2 Tab ==========
 

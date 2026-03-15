@@ -42,7 +42,7 @@ DEFAULT_RESULTS_DIR = Path("output") / "webui"
 INTERNAL_LAUNCH_FLAG = "--_internal-launch"
 APP_HEADER_PREVIEW_URL = "https://raw.githubusercontent.com/Sunwood-ai-labs/video-background-remover-cli/main/example/output_animated.webp"
 DEFAULT_UI_LANGUAGE = "ja"
-AUTO_RESUME_RUN_DIR_FOLDERS = ("matanyone2_video", "matanyone2_tile")
+AUTO_RESUME_RUN_DIR_FOLDERS = ("matanyone2_tile",)
 LANGUAGE_CHOICES = [("日本語", "ja"), ("English", "en")]
 
 UI_TEXT: dict[str, dict[str, str]] = {
@@ -226,12 +226,12 @@ UI_TEXT: dict[str, dict[str, str]] = {
         ),
         "resume_detected_runs_label": "Detected Run Folders",
         "resume_detected_runs_info": (
-            "Auto-detected candidates from output/webui/matanyone2_video and output/webui/matanyone2_tile. "
+            "Auto-detected candidates from output/webui/matanyone2_tile. "
             "Latest folders appear first."
         ),
         "refresh_detected_runs_button": "Refresh Detected Folders",
         "resume_run_dir_label": "MatAnyone Run Directory",
-        "resume_run_dir_placeholder": r"D:\path\to\output\webui\matanyone2_video\run_dir",
+        "resume_run_dir_placeholder": r"D:\path\to\output\webui\matanyone2_tile\run_dir",
         "resume_fg_path_label": "Foreground Video Path",
         "resume_fg_path_placeholder": r"D:\path\to\clip_fg.mp4",
         "resume_alpha_path_label": "Alpha Video Path (optional)",
@@ -561,12 +561,12 @@ UI_TEXT: dict[str, dict[str, str]] = {
         ),
         "resume_detected_runs_label": "自動検出した実行フォルダ",
         "resume_detected_runs_info": (
-            "output/webui/matanyone2_video と output/webui/matanyone2_tile から見つけた候補です。"
+            "output/webui/matanyone2_tile から見つけた候補です。"
             "新しいフォルダが上に出ます。"
         ),
         "refresh_detected_runs_button": "候補を再読み込み",
         "resume_run_dir_label": "MatAnyone 実行フォルダ",
-        "resume_run_dir_placeholder": r"D:\path\to\output\webui\matanyone2_video\run_dir",
+        "resume_run_dir_placeholder": r"D:\path\to\output\webui\matanyone2_tile\run_dir",
         "resume_fg_path_label": "Foreground 動画パス",
         "resume_fg_path_placeholder": r"D:\path\to\clip_fg.mp4",
         "resume_alpha_path_label": "Alpha 動画パス（任意）",
@@ -1252,6 +1252,21 @@ def _split_frame_sequence_into_tiles(
 def _normalize_existing_path(value: str | None) -> str | None:
     normalized = (value or "").strip()
     return normalized or None
+
+
+def _build_single_path_examples(paths: list[str]) -> list[list[str]]:
+    examples: list[list[str]] = []
+    seen_paths: set[str] = set()
+    for path in paths:
+        normalized = _normalize_existing_path(path)
+        if not normalized:
+            continue
+        resolved_path = str(Path(normalized))
+        if resolved_path in seen_paths:
+            continue
+        examples.append([resolved_path])
+        seen_paths.add(resolved_path)
+    return examples
 
 
 def _infer_matanyone_run_dir(
@@ -2350,7 +2365,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
         _push_progress(progress, 0.2, _ui_text(language, "progress_loading_existing_output"))
         source_run_dir = resume_state.get("run_dir")
         output_dir = create_run_output_dir(
-            str(results_root / "matanyone2_tile_resume"),
+            str(results_root / "matanyone2_tile"),
             {"video_name": Path(fg_video_path).stem},
         )
         output_stem = str(resume_state.get("video_name") or Path(fg_video_path).stem)
@@ -4692,6 +4707,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                 ma2_tile_resume_state = gr.State({})
                 initial_tile_resume_run_dirs = _list_detected_tile_resume_run_dirs(results_root)
                 initial_tile_resume_run_dir = initial_tile_resume_run_dirs[0] if initial_tile_resume_run_dirs else ""
+                initial_tile_resume_examples = _build_single_path_examples(initial_tile_resume_run_dirs)
 
                 with gr.Group():
                     with gr.Row():
@@ -4840,6 +4856,11 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                             ma2_tile_resume_alpha_path = gr.Textbox(
                                 label=_ui_text(default_language, "resume_alpha_path_label"),
                                 placeholder=_ui_text(default_language, "resume_alpha_path_placeholder"),
+                            )
+                        if initial_tile_resume_examples:
+                            gr.Examples(
+                                examples=initial_tile_resume_examples,
+                                inputs=[ma2_tile_resume_run_dir],
                             )
                         ma2_tile_load_existing_button = gr.Button(
                             value=_ui_text(default_language, "load_existing_output_button"),
@@ -5334,7 +5355,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                     outputs=[ma2_tile_template_frame, ma2_tile_click_state],
                 )
 
-                if matanyone_tile_examples:
+                if not initial_tile_resume_examples and matanyone_tile_examples:
                     gr.Examples(examples=matanyone_tile_examples, inputs=[ma2_tile_input])
 
             build_cli_export_tab(

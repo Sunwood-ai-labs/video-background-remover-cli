@@ -15,6 +15,31 @@
 | Comparison WebP | `example/onizuka_walk_motion.webp` |
 | Transparent frames | `output_frames_webp/` |
 
+## MatAnyone2 Tile WebUI Samples
+
+The Tile workflow now documents both the UI and the generated split animations. The screenshots below were captured from the `MatAnyone2 Tile` tab, and the sample animated assets come from the documented 3x3 run under `docs/public/media/matanyone2_tile/`.
+
+### Resume from an existing Tile run
+
+![MatAnyone2 Tile resume picker](/media/matanyone2_tile/webui-resume-en.png)
+
+### Preview grid after split export
+
+![MatAnyone2 Tile preview grid](/media/matanyone2_tile/webui-preview-en.png)
+
+### Sample 3x3 tile outputs
+
+| Animated WebP tile | Animated GIF tile |
+| --- | --- |
+| ![MatAnyone2 Tile sample WebP tile](/media/matanyone2_tile/tiles_3x3/tile_01_animated.webp) | ![MatAnyone2 Tile sample GIF tile](/media/matanyone2_tile/tiles_3x3/tile_01_animated.gif) |
+
+Asset paths:
+
+- `/media/matanyone2_tile/webui-resume-en.png`
+- `/media/matanyone2_tile/webui-preview-en.png`
+- `/media/matanyone2_tile/tiles_3x3/tile_01_animated.webp`
+- `/media/matanyone2_tile/tiles_3x3/tile_01_animated.gif`
+
 ## MatAnyone Recipes
 
 ### Transparent WebP from a foreground + alpha pair

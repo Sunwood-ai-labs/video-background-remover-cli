@@ -87,6 +87,41 @@ Notes:
 - Image outputs are saved as `png` and `webp`.
 - Video outputs keep the original foreground/alpha pair and can then be exported as `webp`, `gif`, `png` frame ZIPs, `mp4`, or `webm`.
 
+### MatAnyone2 Tile WebUI
+
+`MatAnyone2 Tile` is the WebUI route for 2x2 or 3x3 tiled videos. It runs the usual MatAnyone masking flow, keeps the combined foreground/alpha pair, and then splits the finished result into one animated `webp` and one animated `gif` per tile.
+
+- Fresh runs and resume runs are grouped under `output/webui/matanyone2_tile/<run-dir>/`.
+- Split animations are written under `tiles_2x2/` or `tiles_3x3/`.
+- The auto-detected resume picker stays focused on Tile runs only, but you can still paste any absolute run directory or `*_fg.mp4` path when you need to resume from somewhere else.
+
+<p align="center">
+  <img src="docs/public/media/matanyone2_tile/webui-resume-en.png" alt="MatAnyone2 Tile resume picker in the WebUI" width="720">
+</p>
+
+<p align="center">
+  <img src="docs/public/media/matanyone2_tile/webui-preview-en.png" alt="MatAnyone2 Tile animated preview grid in the WebUI" width="720">
+</p>
+
+Example output layout:
+
+```text
+output/webui/matanyone2_tile/<run-dir>/
+├─ <source>.mp4_fg.mp4
+├─ <source>.mp4_alpha.mp4
+├─ metadata.json
+└─ tiles_3x3/
+   ├─ tile_01_animated.webp
+   ├─ tile_01_animated.gif
+   └─ ...
+```
+
+Sample tile assets from the documented 3x3 run:
+
+| Animated WebP tile | Animated GIF tile |
+| --- | --- |
+| <img src="docs/public/media/matanyone2_tile/tiles_3x3/tile_01_animated.webp" alt="MatAnyone2 Tile sample WebP tile" width="180"> | <img src="docs/public/media/matanyone2_tile/tiles_3x3/tile_01_animated.gif" alt="MatAnyone2 Tile sample GIF tile" width="180"> |
+
 ### 1. Export a video with a white background
 
 ```bash

@@ -15,6 +15,31 @@
 | 比較用 WebP | `example/onizuka_walk_motion.webp` |
 | 透過フレーム | `output_frames_webp/` |
 
+## MatAnyone2 Tile WebUI サンプル
+
+Tile ワークフローの UI と分割後の animated 出力をまとめて確認できるように、`MatAnyone2 Tile` タブのスクリーンショットと 3x3 の sample assets を docs に含めています。
+
+### 既存の Tile run から再開
+
+![MatAnyone2 Tile の再開 picker](/media/matanyone2_tile/webui-resume-en.png)
+
+### 分割後の preview grid
+
+![MatAnyone2 Tile の preview grid](/media/matanyone2_tile/webui-preview-en.png)
+
+### 3x3 tile の sample outputs
+
+| Animated WebP tile | Animated GIF tile |
+| --- | --- |
+| ![MatAnyone2 Tile の WebP サンプル](/media/matanyone2_tile/tiles_3x3/tile_01_animated.webp) | ![MatAnyone2 Tile の GIF サンプル](/media/matanyone2_tile/tiles_3x3/tile_01_animated.gif) |
+
+アセットの保存場所:
+
+- `/media/matanyone2_tile/webui-resume-en.png`
+- `/media/matanyone2_tile/webui-preview-en.png`
+- `/media/matanyone2_tile/tiles_3x3/tile_01_animated.webp`
+- `/media/matanyone2_tile/tiles_3x3/tile_01_animated.gif`
+
 ## MatAnyone レシピ
 
 ### 前景動画 + マスク動画から透過 WebP を作る

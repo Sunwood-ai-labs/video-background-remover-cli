@@ -83,6 +83,41 @@ video-background-remover-webui --port 7860
 - 画像出力は `png` と `webp` を保存します。
 - 動画出力は foreground / alpha のペアを保持したうえで、`webp`、`gif`、`png` フレーム ZIP、`mp4`、`webm` に再書き出しできます。
 
+### MatAnyone2 Tile WebUI
+
+`MatAnyone2 Tile` は 2x2 / 3x3 のタイル動画向けの WebUI 導線です。通常の MatAnyone マスク操作で foreground / alpha を作ったあと、完成した結果をタイルごとに分割して animated `webp` と `gif` を両方出力します。
+
+- 最初から実行した場合も、既存出力から再開した場合も、成果物は `output/webui/matanyone2_tile/<run-dir>/` にまとまります。
+- 分割後のアニメーションは `tiles_2x2/` または `tiles_3x3/` に保存されます。
+- 自動検出の候補一覧は Tile 用 run folder だけを出すので見やすく、必要なら絶対パスで任意の run dir や `*_fg.mp4` を直接指定できます。
+
+<p align="center">
+  <img src="docs/public/media/matanyone2_tile/webui-resume-en.png" alt="MatAnyone2 Tile の再開 picker" width="720">
+</p>
+
+<p align="center">
+  <img src="docs/public/media/matanyone2_tile/webui-preview-en.png" alt="MatAnyone2 Tile のプレビュー grid" width="720">
+</p>
+
+出力フォルダ例:
+
+```text
+output/webui/matanyone2_tile/<run-dir>/
+├─ <source>.mp4_fg.mp4
+├─ <source>.mp4_alpha.mp4
+├─ metadata.json
+└─ tiles_3x3/
+   ├─ tile_01_animated.webp
+   ├─ tile_01_animated.gif
+   └─ ...
+```
+
+README で使っている 3x3 サンプル出力:
+
+| Animated WebP tile | Animated GIF tile |
+| --- | --- |
+| <img src="docs/public/media/matanyone2_tile/tiles_3x3/tile_01_animated.webp" alt="MatAnyone2 Tile の WebP サンプル" width="180"> | <img src="docs/public/media/matanyone2_tile/tiles_3x3/tile_01_animated.gif" alt="MatAnyone2 Tile の GIF サンプル" width="180"> |
+
 ### 1. 背景を白で埋めた動画を出力
 
 ```bash

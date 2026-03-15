@@ -71,6 +71,38 @@ python main.py assets/MatAnyone --matanyone output/matanyone_frames --interval 0
 
 補正違いを複数書き出して比較するときは、`MatAnyone_cat3_trim_sm0_gb4_rb60_as180_am120_md255.webp` のように補正プロファイルや調整値をファイル名へ含めておくと再確認しやすくなります。
 
+## MatAnyone2 Tile WebUI
+
+`MatAnyone2 Tile` タブは、入力が 2x2 / 3x3 のタイル動画になっているときのための WebUI 導線です。通常の MatAnyone マスク操作で foreground / alpha を作ったあと、完成した結果をタイルごとに分割し、animated `webp` と `gif` を両方出力します。
+
+![MatAnyone2 Tile の再開 picker](/media/matanyone2_tile/webui-resume-en.png)
+
+### Tile workflow
+
+1. `MatAnyone2 Tile` でタイル動画を読み込みます。
+2. `2x2` または `3x3` を選び、マスクを追加して `Tile Video Matting` を実行します。
+3. 途中から始めたい場合は `既存出力から再開` を開き、自動検出された Tile run folder を選んで読み込みます。
+4. `出力 FPS`、`最大フレーム数`、`Bounce Loop` を調整してから、分割 tile 出力を生成します。
+
+### 出力フォルダ構成
+
+- 最初から実行した場合も、既存出力から再開した場合も、成果物は `output/webui/matanyone2_tile/<run-dir>/` にまとまります。
+- 分割アニメーションは `tiles_2x2/` または `tiles_3x3/` に保存されます。
+- 自動検出一覧は Tile 用 run folder だけに絞っているので見やすく、必要なら絶対パスで任意の run dir や `*_fg.mp4` を直接指定できます。
+
+```text
+output/webui/matanyone2_tile/<run-dir>/
+├─ <source>.mp4_fg.mp4
+├─ <source>.mp4_alpha.mp4
+├─ metadata.json
+└─ tiles_3x3/
+   ├─ tile_01_animated.webp
+   ├─ tile_01_animated.gif
+   └─ ...
+```
+
+![MatAnyone2 Tile の preview grid](/media/matanyone2_tile/webui-preview-en.png)
+
 ## オプション一覧
 
 | オプション | 説明 |

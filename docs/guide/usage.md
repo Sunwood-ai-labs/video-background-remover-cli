@@ -73,6 +73,39 @@ Notes:
 
 When you export several MatAnyone cleanup trials, encode the profile or tuning values in the output filename so the comparison stays reproducible, for example `MatAnyone_cat3_trim_sm0_gb4_rb60_as180_am120_md255.webp`.
 
+## MatAnyone2 Tile WebUI
+
+Use the `MatAnyone2 Tile` tab in the Gradio WebUI when the input is already arranged as a 2x2 or 3x3 tile sheet. The tab keeps the normal interactive mask workflow, then splits the finished foreground and alpha result into one animated `webp` and one animated `gif` per tile.
+
+![MatAnyone2 Tile resume picker](/media/matanyone2_tile/webui-resume-en.png)
+
+### Tile workflow
+
+1. Load the tiled source video in `MatAnyone2 Tile`.
+2. Pick `2x2` or `3x3`, add the mask, and run `Tile Video Matting`.
+3. Or, open `Resume From Existing Output` and select a detected Tile run folder to skip masking.
+4. Adjust `Export FPS`, `Max Frames`, and `Bounce Loop`, then render the split tile exports.
+
+### Output structure
+
+- Fresh runs and resumed runs both save into `output/webui/matanyone2_tile/<run-dir>/`.
+- Split animations are written into `tiles_2x2/` or `tiles_3x3/`.
+- The auto-detected resume list only shows Tile-specific run folders so the picker stays compact.
+- If you need a different source, you can still paste an absolute run directory or `*_fg.mp4` path manually.
+
+```text
+output/webui/matanyone2_tile/<run-dir>/
+├─ <source>.mp4_fg.mp4
+├─ <source>.mp4_alpha.mp4
+├─ metadata.json
+└─ tiles_3x3/
+   ├─ tile_01_animated.webp
+   ├─ tile_01_animated.gif
+   └─ ...
+```
+
+![MatAnyone2 Tile preview grid](/media/matanyone2_tile/webui-preview-en.png)
+
 ## MatAnyone Package Backend
 
 Use `--backend matanyone` when you want this CLI to import the published `matanyone2-runtime` package and generate the foreground and alpha pair for the current input.

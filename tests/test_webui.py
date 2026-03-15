@@ -16,6 +16,7 @@ if str(SRC) not in sys.path:
 from video_background_remover_cli.webui import (
     INTERNAL_LAUNCH_FLAG,
     _build_advanced_rembg_examples,
+    _build_single_path_examples,
     _build_output_path_placeholder,
     _build_preview_sections_html,
     _build_resize_ratio_text,
@@ -125,6 +126,25 @@ class CliHelperTests(unittest.TestCase):
         self.assertEqual(
             text,
             "Resize ratio 0.50 -> 640 x 360 (from 1280 x 720)",
+        )
+
+    def test_build_single_path_examples_filters_blanks_and_duplicates(self) -> None:
+        examples = _build_single_path_examples(
+            [
+                "",
+                "  ",
+                r"D:\runs\tile_a",
+                r"D:\runs\tile_a",
+                r"D:\runs\tile_b",
+            ]
+        )
+
+        self.assertEqual(
+            examples,
+            [
+                [r"D:\runs\tile_a"],
+                [r"D:\runs\tile_b"],
+            ],
         )
 
     def test_build_resize_ratio_text_reports_scaled_size_in_japanese(self) -> None:
@@ -242,12 +262,10 @@ class CliHelperTests(unittest.TestCase):
     def test_list_detected_tile_resume_run_dirs_prefers_latest_valid_runs(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             results_root = Path(tmpdir)
-            video_root = results_root / "matanyone2_video"
             tile_root = results_root / "matanyone2_tile"
-            video_root.mkdir()
             tile_root.mkdir()
 
-            older_run = video_root / "older_run"
+            older_run = tile_root / "older_run"
             older_run.mkdir()
             (older_run / "metadata.json").write_text("{}", encoding="utf-8")
             (older_run / "clip_fg.mp4").write_bytes(b"fg")
@@ -259,12 +277,19 @@ class CliHelperTests(unittest.TestCase):
             (newer_run / "clip_fg.mp4").write_bytes(b"fg")
             (newer_run / "clip_alpha.mp4").write_bytes(b"alpha")
 
-            invalid_run = video_root / "invalid_run"
+            ignored_video_run = results_root / "matanyone2_video" / "ignored_video_run"
+            ignored_video_run.mkdir(parents=True)
+            (ignored_video_run / "metadata.json").write_text("{}", encoding="utf-8")
+            (ignored_video_run / "clip_fg.mp4").write_bytes(b"fg")
+            (ignored_video_run / "clip_alpha.mp4").write_bytes(b"alpha")
+
+            invalid_run = tile_root / "invalid_run"
             invalid_run.mkdir()
             (invalid_run / "metadata.json").write_text("{}", encoding="utf-8")
 
             os.utime(older_run, (10, 10))
             os.utime(newer_run, (20, 20))
+            os.utime(ignored_video_run, (40, 40))
             os.utime(invalid_run, (30, 30))
 
             detected = _list_detected_tile_resume_run_dirs(results_root)

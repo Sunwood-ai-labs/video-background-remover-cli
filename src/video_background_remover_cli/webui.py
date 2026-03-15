@@ -42,6 +42,7 @@ DEFAULT_RESULTS_DIR = Path("output") / "webui"
 INTERNAL_LAUNCH_FLAG = "--_internal-launch"
 APP_HEADER_PREVIEW_URL = "https://raw.githubusercontent.com/Sunwood-ai-labs/video-background-remover-cli/main/example/output_animated.webp"
 DEFAULT_UI_LANGUAGE = "ja"
+AUTO_RESUME_RUN_DIR_FOLDERS = ("matanyone2_video", "matanyone2_tile")
 LANGUAGE_CHOICES = [("日本語", "ja"), ("English", "en")]
 
 UI_TEXT: dict[str, dict[str, str]] = {
@@ -223,6 +224,12 @@ UI_TEXT: dict[str, dict[str, str]] = {
             "Load a previous MatAnyone run directory or an existing foreground/alpha pair to skip "
             "masking and matting, then render the tiled animated exports directly."
         ),
+        "resume_detected_runs_label": "Detected Run Folders",
+        "resume_detected_runs_info": (
+            "Auto-detected candidates from output/webui/matanyone2_video and output/webui/matanyone2_tile. "
+            "Latest folders appear first."
+        ),
+        "refresh_detected_runs_button": "Refresh Detected Folders",
         "resume_run_dir_label": "MatAnyone Run Directory",
         "resume_run_dir_placeholder": r"D:\path\to\output\webui\matanyone2_video\run_dir",
         "resume_fg_path_label": "Foreground Video Path",
@@ -552,6 +559,12 @@ UI_TEXT: dict[str, dict[str, str]] = {
             "前回の MatAnyone 実行フォルダや既存の foreground / alpha ペアを読み込んで、"
             "マスク作成とマッティングをスキップしたままタイル書き出しだけ再開できます。"
         ),
+        "resume_detected_runs_label": "自動検出した実行フォルダ",
+        "resume_detected_runs_info": (
+            "output/webui/matanyone2_video と output/webui/matanyone2_tile から見つけた候補です。"
+            "新しいフォルダが上に出ます。"
+        ),
+        "refresh_detected_runs_button": "候補を再読み込み",
         "resume_run_dir_label": "MatAnyone 実行フォルダ",
         "resume_run_dir_placeholder": r"D:\path\to\output\webui\matanyone2_video\run_dir",
         "resume_fg_path_label": "Foreground 動画パス",
@@ -1298,6 +1311,46 @@ def _discover_matanyone_run_artifacts(run_dir: str | None) -> dict[str, str | No
     }
 
 
+def _list_detected_tile_resume_run_dirs(
+    results_root: str | Path,
+    *,
+    limit: int = 20,
+) -> list[str]:
+    results_path = Path(results_root)
+    candidates: list[tuple[float, str]] = []
+    seen_paths: set[str] = set()
+
+    for folder_name in AUTO_RESUME_RUN_DIR_FOLDERS:
+        search_root = results_path / folder_name
+        if not search_root.exists():
+            continue
+
+        for child in search_root.iterdir():
+            if not child.is_dir():
+                continue
+
+            resolved_path = str(child.resolve())
+            if resolved_path in seen_paths or not (child / "metadata.json").exists():
+                continue
+
+            try:
+                resolve_matanyone_inputs(resolved_path, None)
+            except ValueError:
+                continue
+
+            try:
+                modified_at = child.stat().st_mtime
+            except OSError:
+                modified_at = 0.0
+
+            candidates.append((modified_at, resolved_path))
+            seen_paths.add(resolved_path)
+
+    candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    safe_limit = max(1, int(limit))
+    return [path for _, path in candidates[:safe_limit]]
+
+
 def _resolve_tile_resume_source(
     run_dir: str | None,
     fg_video_path: str | None,
@@ -1800,6 +1853,43 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             gr.update(value="", visible=False),
             gr.update(value="\n".join(status_lines)),
             gr.update(interactive=True),
+        )
+
+    def refresh_detected_tile_resume_dirs_v2(
+        current_run_dir: str,
+        current_fg_path: str,
+        current_alpha_path: str,
+    ):
+        detected_run_dirs = _list_detected_tile_resume_run_dirs(results_root)
+        next_run_dir = _normalize_existing_path(current_run_dir)
+        if (
+            not next_run_dir
+            and not _normalize_existing_path(current_fg_path)
+            and not _normalize_existing_path(current_alpha_path)
+            and detected_run_dirs
+        ):
+            next_run_dir = detected_run_dirs[0]
+
+        dropdown_value = next_run_dir if next_run_dir in detected_run_dirs else None
+        return (
+            gr.update(
+                choices=detected_run_dirs,
+                value=dropdown_value,
+                interactive=True,
+            ),
+            gr.update(value=next_run_dir or ""),
+            {},
+            gr.update(interactive=False),
+        )
+
+    def select_detected_tile_resume_dir_v2(selected_run_dir: str):
+        normalized_run_dir = _normalize_existing_path(selected_run_dir) or ""
+        return (
+            gr.update(value=normalized_run_dir),
+            gr.update(value=""),
+            gr.update(value=""),
+            {},
+            gr.update(interactive=False),
         )
 
     def get_frames_from_image_v2(
@@ -4600,6 +4690,8 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                     "performance_profile": args.performance_profile,
                 })
                 ma2_tile_resume_state = gr.State({})
+                initial_tile_resume_run_dirs = _list_detected_tile_resume_run_dirs(results_root)
+                initial_tile_resume_run_dir = initial_tile_resume_run_dirs[0] if initial_tile_resume_run_dirs else ""
 
                 with gr.Group():
                     with gr.Row():
@@ -4723,9 +4815,22 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                             _ui_text(default_language, "resume_tile_description")
                         )
                         with gr.Row():
+                            ma2_tile_resume_detected_runs = gr.Dropdown(
+                                choices=initial_tile_resume_run_dirs,
+                                value=initial_tile_resume_run_dir or None,
+                                label=_ui_text(default_language, "resume_detected_runs_label"),
+                                info=_ui_text(default_language, "resume_detected_runs_info"),
+                                interactive=True,
+                            )
+                            ma2_tile_refresh_detected_runs_button = gr.Button(
+                                value=_ui_text(default_language, "refresh_detected_runs_button"),
+                                interactive=True,
+                            )
+                        with gr.Row():
                             ma2_tile_resume_run_dir = gr.Textbox(
                                 label=_ui_text(default_language, "resume_run_dir_label"),
                                 placeholder=_ui_text(default_language, "resume_run_dir_placeholder"),
+                                value=initial_tile_resume_run_dir,
                             )
                         with gr.Row():
                             ma2_tile_resume_fg_path = gr.Textbox(
@@ -4834,6 +4939,13 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                     ma2_tile_resume_description_markdown,
                     lambda lang, _meta, _ratio: gr.update(value=_ui_text(lang, "resume_tile_description")),
                 )
+                register_language_target(
+                    ma2_tile_resume_detected_runs,
+                    lambda lang, _meta, _ratio: gr.update(
+                        label=_ui_text(lang, "resume_detected_runs_label"),
+                        info=_ui_text(lang, "resume_detected_runs_info"),
+                    ),
+                )
                 for component, key in [
                     (ma2_tile_model_selection, "label_model_selection"),
                     (ma2_tile_performance_profile, "performance_profile_label"),
@@ -4916,6 +5028,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                     (ma2_tile_remove_mask_button, "remove_masks_button"),
                     (ma2_tile_video_matting_button, "tile_video_matting_button"),
                     (ma2_tile_load_existing_button, "load_existing_output_button"),
+                    (ma2_tile_refresh_detected_runs_button, "refresh_detected_runs_button"),
                     (ma2_tile_render_existing_button, "render_tile_exports_button"),
                 ]:
                     register_language_target(
@@ -5107,6 +5220,37 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                         ma2_tile_status,
                     ],
                     show_progress="full",
+                )
+
+                ma2_tile_refresh_detected_runs_button.click(
+                    fn=refresh_detected_tile_resume_dirs_v2,
+                    inputs=[
+                        ma2_tile_resume_run_dir,
+                        ma2_tile_resume_fg_path,
+                        ma2_tile_resume_alpha_path,
+                    ],
+                    outputs=[
+                        ma2_tile_resume_detected_runs,
+                        ma2_tile_resume_run_dir,
+                        ma2_tile_resume_state,
+                        ma2_tile_render_existing_button,
+                    ],
+                    queue=False,
+                    show_progress=False,
+                )
+
+                ma2_tile_resume_detected_runs.change(
+                    fn=select_detected_tile_resume_dir_v2,
+                    inputs=[ma2_tile_resume_detected_runs],
+                    outputs=[
+                        ma2_tile_resume_run_dir,
+                        ma2_tile_resume_fg_path,
+                        ma2_tile_resume_alpha_path,
+                        ma2_tile_resume_state,
+                        ma2_tile_render_existing_button,
+                    ],
+                    queue=False,
+                    show_progress=False,
                 )
 
                 ma2_tile_load_existing_button.click(

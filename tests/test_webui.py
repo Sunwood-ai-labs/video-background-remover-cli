@@ -24,6 +24,7 @@ from video_background_remover_cli.webui import (
     _collect_existing_example_paths,
     _compute_scaled_dimensions,
     _discover_matanyone_run_artifacts,
+    _list_detected_tile_resume_run_dirs,
     _parse_points_text,
     _resolve_tile_resume_source,
     _split_frame_sequence_into_tiles,
@@ -237,6 +238,38 @@ class CliHelperTests(unittest.TestCase):
 
             self.assertEqual(artifacts["existing_webp"], str(run_dir / "clip_animated.webp"))
             self.assertEqual(artifacts["existing_gif"], str(run_dir / "clip_animated.gif"))
+
+    def test_list_detected_tile_resume_run_dirs_prefers_latest_valid_runs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            results_root = Path(tmpdir)
+            video_root = results_root / "matanyone2_video"
+            tile_root = results_root / "matanyone2_tile"
+            video_root.mkdir()
+            tile_root.mkdir()
+
+            older_run = video_root / "older_run"
+            older_run.mkdir()
+            (older_run / "metadata.json").write_text("{}", encoding="utf-8")
+            (older_run / "clip_fg.mp4").write_bytes(b"fg")
+            (older_run / "clip_alpha.mp4").write_bytes(b"alpha")
+
+            newer_run = tile_root / "newer_run"
+            newer_run.mkdir()
+            (newer_run / "metadata.json").write_text("{}", encoding="utf-8")
+            (newer_run / "clip_fg.mp4").write_bytes(b"fg")
+            (newer_run / "clip_alpha.mp4").write_bytes(b"alpha")
+
+            invalid_run = video_root / "invalid_run"
+            invalid_run.mkdir()
+            (invalid_run / "metadata.json").write_text("{}", encoding="utf-8")
+
+            os.utime(older_run, (10, 10))
+            os.utime(newer_run, (20, 20))
+            os.utime(invalid_run, (30, 30))
+
+            detected = _list_detected_tile_resume_run_dirs(results_root)
+
+            self.assertEqual(detected, [str(newer_run.resolve()), str(older_run.resolve())])
 
     def test_resolve_tile_resume_source_from_run_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

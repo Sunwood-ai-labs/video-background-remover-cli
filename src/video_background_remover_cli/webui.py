@@ -6,6 +6,7 @@ import asyncio
 import argparse
 from datetime import datetime
 import html
+import json
 import os
 from pathlib import Path
 import sys
@@ -91,7 +92,7 @@ UI_TEXT: dict[str, dict[str, str]] = {
         "alpha_video_label": "Alpha Video",
         "manual_alpha_label": "Or Manual Alpha Path",
         "output_path_label": "Output Path (optional)",
-        "output_path_placeholder": "Leave blank to auto-save under output\\webui\\cli_runs",
+        "output_path_placeholder_named": "Leave blank to auto-save under output\\webui\\{folder}",
         "general_output_settings": "General Output Settings",
         "regular_video_format_label": "Regular Video Format",
         "animated_format_label": "Animated Format",
@@ -217,6 +218,19 @@ UI_TEXT: dict[str, dict[str, str]] = {
             "Choose the tile layout that matches your input video. The full foreground/alpha pair "
             "is still saved, while the preview area shows one animated export per tile."
         ),
+        "resume_tile_header": "Resume From Existing Output",
+        "resume_tile_description": (
+            "Load a previous MatAnyone run directory or an existing foreground/alpha pair to skip "
+            "masking and matting, then render the tiled animated exports directly."
+        ),
+        "resume_run_dir_label": "MatAnyone Run Directory",
+        "resume_run_dir_placeholder": r"D:\path\to\output\webui\matanyone2_video\run_dir",
+        "resume_fg_path_label": "Foreground Video Path",
+        "resume_fg_path_placeholder": r"D:\path\to\clip_fg.mp4",
+        "resume_alpha_path_label": "Alpha Video Path (optional)",
+        "resume_alpha_path_placeholder": r"D:\path\to\clip_alpha.mp4",
+        "load_existing_output_button": "Load Existing Output",
+        "render_tile_exports_button": "Render Tile Exports",
         "matting_settings_label": "Matting Settings",
         "label_model_selection": "Model Selection",
         "info_choose_model": "Choose the model to use for matting",
@@ -285,6 +299,9 @@ UI_TEXT: dict[str, dict[str, str]] = {
         "matanyone_tile_preview_hint": (
             "After `Tile Video Matting` finishes, each tile appears below with its own animated preview and download button."
         ),
+        "matanyone_tile_resume_hint": (
+            "If you already have a MatAnyone run directory or `*_fg.mp4`, load it here and skip the mask step."
+        ),
         "label_refine_iterations": "Num of Refinement Iterations",
         "info_refine_iterations": "More iterations = More details & More time",
         "default_video_info": "Load a video to prepare the interactive frame.",
@@ -294,14 +311,17 @@ UI_TEXT: dict[str, dict[str, str]] = {
         "progress_preparing_interactive_preview": "Preparing the interactive preview...",
         "error_load_video_first": "Load a video first.",
         "error_load_image_first": "Load an image first.",
+        "error_resume_existing_output_first": "Enter a MatAnyone run directory or a foreground video path first.",
         "status_preparing_matting_exports": "Preparing MatAnyone video matting and animated exports...",
         "status_preparing_tile_matting_exports": "Preparing MatAnyone tiled video matting and split animated exports...",
+        "status_preparing_tile_resume_exports": "Preparing split tile exports from an existing MatAnyone output...",
         "progress_loading_selected_model": "Loading the selected model...",
         "progress_building_selected_mask": "Building the selected mask...",
         "progress_running_video_matting": "Running MatAnyone video matting...",
         "progress_encoding_foreground_alpha": "Encoding foreground and alpha videos...",
         "progress_saving_debug_artifacts": "Saving debug artifacts...",
         "progress_rendering_animated_webp_gif": "Rendering animated WebP and GIF...",
+        "progress_loading_existing_output": "Loading existing MatAnyone outputs...",
         "progress_splitting_tiled_outputs": "Splitting tiled outputs into {layout} exports...",
         "progress_rendering_tiled_webp_gif": "Rendering split tile WebP and GIF exports...",
         "progress_video_matting_complete": "Video matting and animated exports complete",
@@ -324,6 +344,23 @@ UI_TEXT: dict[str, dict[str, str]] = {
             "Tiles: {tile_count}\n"
             "Tile outputs: {tile_dir}\n"
             "Debug artifacts: {debug_dir}"
+        ),
+        "status_loaded_existing_output": (
+            "Existing MatAnyone output loaded. Choose a tile layout, adjust the export settings, "
+            "then click `Render Tile Exports`."
+        ),
+        "status_resume_run_dir": "Run dir: {value}",
+        "status_resume_foreground": "Foreground: {value}",
+        "status_resume_alpha": "Alpha: {value}",
+        "status_resume_existing_webp": "Existing WebP: {value}",
+        "status_resume_existing_gif": "Existing GIF: {value}",
+        "status_matanyone_tile_resume_done": (
+            "Done. Split tile exports were rendered from an existing MatAnyone output.\n"
+            "Foreground: {foreground}\n"
+            "Alpha: {alpha}\n"
+            "Tile layout: {layout}\n"
+            "Tiles: {tile_count}\n"
+            "Tile outputs: {tile_dir}"
         ),
         "progress_running_image_matting": "Running MatAnyone image matting...",
         "progress_saving_image_outputs": "Saving image outputs...",
@@ -392,7 +429,7 @@ UI_TEXT: dict[str, dict[str, str]] = {
         "alpha_video_label": "Alpha 動画",
         "manual_alpha_label": "または Alpha パス",
         "output_path_label": "出力パス（任意）",
-        "output_path_placeholder": "空欄なら output\\webui\\cli_runs 配下へ自動保存します",
+        "output_path_placeholder_named": "空欄なら output\\webui\\{folder} 配下へ自動保存します",
         "general_output_settings": "全体の出力設定",
         "regular_video_format_label": "通常動画フォーマット",
         "animated_format_label": "アニメーション形式",
@@ -510,6 +547,19 @@ UI_TEXT: dict[str, dict[str, str]] = {
             "入力動画に合う Tile Layout を選んでください。全体の foreground / alpha ペアも保存しつつ、"
             "プレビュー欄ではタイルごとのアニメーション出力を確認できます。"
         ),
+        "resume_tile_header": "既存出力から再開",
+        "resume_tile_description": (
+            "前回の MatAnyone 実行フォルダや既存の foreground / alpha ペアを読み込んで、"
+            "マスク作成とマッティングをスキップしたままタイル書き出しだけ再開できます。"
+        ),
+        "resume_run_dir_label": "MatAnyone 実行フォルダ",
+        "resume_run_dir_placeholder": r"D:\path\to\output\webui\matanyone2_video\run_dir",
+        "resume_fg_path_label": "Foreground 動画パス",
+        "resume_fg_path_placeholder": r"D:\path\to\clip_fg.mp4",
+        "resume_alpha_path_label": "Alpha 動画パス（任意）",
+        "resume_alpha_path_placeholder": r"D:\path\to\clip_alpha.mp4",
+        "load_existing_output_button": "既存出力を読み込む",
+        "render_tile_exports_button": "Tile 出力を生成",
         "matting_settings_label": "マッティング設定",
         "label_model_selection": "モデル選択",
         "info_choose_model": "マッティングに使うモデルを選びます",
@@ -578,6 +628,9 @@ UI_TEXT: dict[str, dict[str, str]] = {
         "matanyone_tile_preview_hint": (
             "`Tile Video Matting` 完了後に、各タイルのアニメーションをここでプレビューして直接ダウンロードできます。"
         ),
+        "matanyone_tile_resume_hint": (
+            "すでに MatAnyone の実行フォルダや `*_fg.mp4` がある場合は、ここから読み込んでマスク手順をスキップできます。"
+        ),
         "label_refine_iterations": "Refinement 回数",
         "info_refine_iterations": "回数を増やすほど細部が出ますが、時間もかかります",
         "default_video_info": "動画を読み込むと操作フレームを準備します。",
@@ -587,14 +640,17 @@ UI_TEXT: dict[str, dict[str, str]] = {
         "progress_preparing_interactive_preview": "操作用プレビューを準備しています...",
         "error_load_video_first": "先に動画を読み込んでください。",
         "error_load_image_first": "先に画像を読み込んでください。",
+        "error_resume_existing_output_first": "MatAnyone 実行フォルダまたは foreground 動画パスを入力してください。",
         "status_preparing_matting_exports": "MatAnyone の動画マッティングとアニメーション出力を準備しています...",
         "status_preparing_tile_matting_exports": "MatAnyone のタイル動画マッティングと分割アニメーション出力を準備しています...",
+        "status_preparing_tile_resume_exports": "既存の MatAnyone 出力から分割タイル出力を準備しています...",
         "progress_loading_selected_model": "選択したモデルを読み込んでいます...",
         "progress_building_selected_mask": "選択したマスクを組み立てています...",
         "progress_running_video_matting": "MatAnyone の動画マッティングを実行しています...",
         "progress_encoding_foreground_alpha": "Foreground と Alpha 動画をエンコードしています...",
         "progress_saving_debug_artifacts": "デバッグ成果物を保存しています...",
         "progress_rendering_animated_webp_gif": "Animated WebP と GIF を生成しています...",
+        "progress_loading_existing_output": "既存の MatAnyone 出力を読み込んでいます...",
         "progress_splitting_tiled_outputs": "{layout} のタイルに分割しています...",
         "progress_rendering_tiled_webp_gif": "分割したタイルの Animated WebP と GIF を生成しています...",
         "progress_video_matting_complete": "動画マッティングとアニメーション出力が完了しました",
@@ -617,6 +673,23 @@ UI_TEXT: dict[str, dict[str, str]] = {
             "Tiles: {tile_count}\n"
             "Tile outputs: {tile_dir}\n"
             "Debug artifacts: {debug_dir}"
+        ),
+        "status_loaded_existing_output": (
+            "既存の MatAnyone 出力を読み込みました。Tile Layout と出力設定を調整してから "
+            "`Tile 出力を生成` を押してください。"
+        ),
+        "status_resume_run_dir": "実行フォルダ: {value}",
+        "status_resume_foreground": "Foreground: {value}",
+        "status_resume_alpha": "Alpha: {value}",
+        "status_resume_existing_webp": "既存 WebP: {value}",
+        "status_resume_existing_gif": "既存 GIF: {value}",
+        "status_matanyone_tile_resume_done": (
+            "完了しました。既存の MatAnyone 出力から分割タイル出力を生成しました。\n"
+            "Foreground: {foreground}\n"
+            "Alpha: {alpha}\n"
+            "Tile layout: {layout}\n"
+            "Tiles: {tile_count}\n"
+            "Tile outputs: {tile_dir}"
         ),
         "progress_running_image_matting": "MatAnyone の画像マッティングを実行しています...",
         "progress_saving_image_outputs": "画像出力を保存しています...",
@@ -1064,6 +1137,30 @@ def _build_preview_gallery_html(previews: list[tuple[str, str | None]]) -> str:
     return f'<div class="ma2-preview-grid">{"".join(cards)}</div>'
 
 
+def _build_preview_sections_html(
+    sections: list[tuple[str, list[tuple[str, str | None]]]],
+) -> str:
+    rendered_sections: list[str] = []
+    for section_title, previews in sections:
+        gallery_html = _build_preview_gallery_html(previews)
+        if not gallery_html:
+            continue
+        safe_title = html.escape(section_title, quote=True)
+        rendered_sections.append(
+            '<section class="ma2-preview-section">'
+            f'<div class="ma2-preview-section-title">{safe_title}</div>'
+            f"{gallery_html}"
+            "</section>"
+        )
+    if not rendered_sections:
+        return ""
+    return f'<div class="ma2-preview-sections">{"".join(rendered_sections)}</div>'
+
+
+def _build_output_path_placeholder(folder_name: str, language: str = DEFAULT_UI_LANGUAGE) -> str:
+    return _ui_text(language, "output_path_placeholder_named", folder=folder_name)
+
+
 def _resolve_tile_layout(tile_layout: str) -> tuple[int, int]:
     layouts = {
         "2x2": (2, 2),
@@ -1137,6 +1234,240 @@ def _split_frame_sequence_into_tiles(
         for tile_index, tile_frame in enumerate(_split_frame_into_tiles(frame, tile_layout)):
             tile_sequences[tile_index].append(tile_frame)
     return tile_sequences
+
+
+def _normalize_existing_path(value: str | None) -> str | None:
+    normalized = (value or "").strip()
+    return normalized or None
+
+
+def _infer_matanyone_run_dir(
+    run_dir: str | None,
+    fg_video_path: str | None,
+    alpha_video_path: str | None,
+) -> str | None:
+    explicit_run_dir = _normalize_existing_path(run_dir)
+    if explicit_run_dir:
+        return str(Path(explicit_run_dir))
+
+    for candidate in [fg_video_path, alpha_video_path]:
+        normalized = _normalize_existing_path(candidate)
+        if not normalized:
+            continue
+        parent = Path(normalized).resolve().parent
+        if (parent / "metadata.json").exists():
+            return str(parent)
+
+    normalized_fg = _normalize_existing_path(fg_video_path)
+    if normalized_fg:
+        return str(Path(normalized_fg).resolve().parent)
+    return None
+
+
+def _read_matanyone_run_metadata(run_dir: str | None) -> dict[str, Any] | None:
+    normalized_run_dir = _normalize_existing_path(run_dir)
+    if not normalized_run_dir:
+        return None
+
+    metadata_path = Path(normalized_run_dir) / "metadata.json"
+    if not metadata_path.exists():
+        return None
+
+    return json.loads(metadata_path.read_text(encoding="utf-8"))
+
+
+def _discover_matanyone_run_artifacts(run_dir: str | None) -> dict[str, str | None]:
+    normalized_run_dir = _normalize_existing_path(run_dir)
+    if not normalized_run_dir:
+        return {"existing_webp": None, "existing_gif": None}
+
+    run_path = Path(normalized_run_dir)
+    existing_webp = None
+    existing_gif = None
+    for path in sorted(run_path.glob("*_animated.webp")):
+        if path.is_file():
+            existing_webp = str(path)
+            break
+    for path in sorted(run_path.glob("*_animated.gif")):
+        if path.is_file():
+            existing_gif = str(path)
+            break
+    return {
+        "existing_webp": existing_webp,
+        "existing_gif": existing_gif,
+    }
+
+
+def _resolve_tile_resume_source(
+    run_dir: str | None,
+    fg_video_path: str | None,
+    alpha_video_path: str | None,
+) -> dict[str, Any]:
+    normalized_fg = _normalize_existing_path(fg_video_path)
+    normalized_alpha = _normalize_existing_path(alpha_video_path)
+    normalized_run_dir = _normalize_existing_path(run_dir)
+
+    if normalized_fg:
+        resolved_fg, resolved_alpha = resolve_matanyone_inputs(
+            normalized_fg,
+            normalized_alpha,
+        )
+    elif normalized_run_dir:
+        resolved_fg, resolved_alpha = resolve_matanyone_inputs(
+            normalized_run_dir,
+            normalized_alpha,
+        )
+    else:
+        raise ValueError("Missing MatAnyone run directory or foreground video path.")
+
+    inferred_run_dir = _infer_matanyone_run_dir(
+        normalized_run_dir,
+        resolved_fg,
+        resolved_alpha,
+    )
+    metadata = _read_matanyone_run_metadata(inferred_run_dir)
+    artifacts = _discover_matanyone_run_artifacts(inferred_run_dir)
+
+    metadata_source = dict(metadata or {})
+    if "width" not in metadata_source or "height" not in metadata_source:
+        video_metadata = _read_video_metadata(resolved_fg)
+        metadata_source.setdefault("width", int(video_metadata.get("width") or 0))
+        metadata_source.setdefault("height", int(video_metadata.get("height") or 0))
+        metadata_source.setdefault("frame_count", int(video_metadata.get("frame_count") or 0))
+        metadata_source.setdefault("fps", float(video_metadata.get("fps") or 0.0))
+        metadata_source.setdefault("duration", float(video_metadata.get("duration") or 0.0))
+    else:
+        source_width, source_height = metadata_source.get("source_size") or [0, 0]
+        fps = float(metadata_source.get("fps") or metadata_source.get("source_fps") or 0.0)
+        frame_count = int(metadata_source.get("num_output_frames") or metadata_source.get("num_input_frames") or 0)
+        duration = frame_count / fps if fps > 0 else 0.0
+        metadata_source.setdefault("width", int(source_width or 0))
+        metadata_source.setdefault("height", int(source_height or 0))
+        metadata_source.setdefault("frame_count", frame_count)
+        metadata_source.setdefault("fps", fps)
+        metadata_source.setdefault("duration", duration)
+
+    source_size_value = metadata_source.get("source_size")
+    source_size = None
+    if isinstance(source_size_value, (list, tuple)) and len(source_size_value) == 2:
+        source_size = (int(source_size_value[0]), int(source_size_value[1]))
+
+    return {
+        "run_dir": inferred_run_dir,
+        "fg_video_path": str(Path(resolved_fg)),
+        "alpha_video_path": str(Path(resolved_alpha)),
+        "metadata": metadata_source,
+        "source_size": source_size,
+        "existing_webp": artifacts["existing_webp"],
+        "existing_gif": artifacts["existing_gif"],
+        "video_name": Path(resolved_fg).stem.replace("_fg", "").replace("_alpha", ""),
+    }
+
+
+def _render_tile_animation_outputs_from_pair(
+    remover: VideoBackgroundRemover,
+    fg_video_path: str,
+    alpha_video_path: str,
+    tile_layout: str,
+    export_fps: int,
+    export_max_frames: int,
+    export_bounce: bool,
+    output_dir: str | Path,
+    output_stem: str,
+    target_size: tuple[int, int] | None = None,
+) -> tuple[str, list[str], list[str]]:
+    import cv2
+
+    fg_cap = cv2.VideoCapture(fg_video_path)
+    alpha_cap = cv2.VideoCapture(alpha_video_path)
+    if not fg_cap.isOpened():
+        raise ValueError(f"Cannot open foreground video: {fg_video_path}")
+    if not alpha_cap.isOpened():
+        fg_cap.release()
+        raise ValueError(f"Cannot open alpha video: {alpha_video_path}")
+
+    try:
+        source_fps = float(fg_cap.get(cv2.CAP_PROP_FPS) or alpha_cap.get(cv2.CAP_PROP_FPS) or 0.0)
+        safe_export_fps = max(1, int(export_fps))
+        frame_skip = 1
+        output_fps = float(safe_export_fps)
+        if source_fps > 0:
+            frame_skip = max(1, int(round(source_fps / safe_export_fps)))
+            output_fps = source_fps / frame_skip
+
+        rows, cols = _resolve_tile_layout(tile_layout)
+        tile_count = rows * cols
+        tile_frames: list[list[Image.Image]] = [[] for _ in range(tile_count)]
+        tile_sizes = _split_size_into_tiles(target_size, tile_layout)
+        sampled_count = 0
+        frame_index = 0
+
+        while True:
+            fg_ok, fg_frame = fg_cap.read()
+            alpha_ok, alpha_frame = alpha_cap.read()
+            if not fg_ok or not alpha_ok:
+                break
+
+            if frame_index % frame_skip == 0:
+                fg_tiles = _split_frame_into_tiles(fg_frame, tile_layout)
+                alpha_tiles = _split_frame_into_tiles(alpha_frame, tile_layout)
+                if tile_sizes is None:
+                    tile_sizes = [
+                        (int(tile.shape[1]), int(tile.shape[0]))
+                        for tile in fg_tiles
+                    ]
+                for tile_index, (tile_fg, tile_alpha) in enumerate(zip(fg_tiles, alpha_tiles)):
+                    rgba_frame = remover._combine_matanyone_frames(
+                        tile_fg,
+                        tile_alpha,
+                        output_size=tile_sizes[tile_index],
+                    )
+                    tile_frames[tile_index].append(Image.fromarray(rgba_frame))
+                sampled_count += 1
+                if _safe_max_frames(export_max_frames) and sampled_count >= _safe_max_frames(export_max_frames):
+                    break
+
+            frame_index += 1
+    finally:
+        fg_cap.release()
+        alpha_cap.release()
+
+    tile_output_dir = Path(output_dir) / f"tiles_{tile_layout}"
+    tile_output_dir.mkdir(parents=True, exist_ok=True)
+
+    tile_webp_outputs: list[str] = []
+    tile_gif_outputs: list[str] = []
+    duration_ms = max(1, int(round(1000 / max(output_fps, 0.01))))
+    for tile_index, frames in enumerate(tile_frames, start=1):
+        if not frames:
+            continue
+
+        prepared_frames = list(frames)
+        if export_bounce and len(prepared_frames) > 1:
+            prepared_frames = prepared_frames + prepared_frames[-2:0:-1]
+
+        base_name = f"tile_{tile_index:02d}_animated"
+        webp_output = str(tile_output_dir / f"{base_name}.webp")
+        gif_output = str(tile_output_dir / f"{base_name}.gif")
+        prepared_frames[0].save(
+            webp_output,
+            format="WEBP",
+            save_all=True,
+            append_images=prepared_frames[1:],
+            duration=duration_ms,
+            loop=0,
+            lossless=False,
+            quality=85,
+        )
+        remover._save_animated_gif(
+            prepared_frames,
+            gif_output,
+            duration_ms=duration_ms,
+        )
+        tile_webp_outputs.append(webp_output)
+        tile_gif_outputs.append(gif_output)
+
+    return str(tile_output_dir), tile_webp_outputs, tile_gif_outputs
 
 
 def _build_cli_output_target(
@@ -1420,6 +1751,57 @@ def _launch_in_process(args: argparse.Namespace) -> int:
         outputs[-1] = gr.update(value=_ui_text(language, "matanyone_tile_loaded_status"))
         return tuple(outputs)
 
+    def load_tile_resume_output_v2(
+        run_dir: str,
+        fg_video_path: str,
+        alpha_video_path: str,
+        language: str,
+        progress=gr.Progress(track_tqdm=True),
+    ):
+        if not _normalize_existing_path(run_dir) and not _normalize_existing_path(fg_video_path):
+            raise gr.Error(_ui_text(language, "error_resume_existing_output_first"))
+        _push_progress(progress, 0.1, _ui_text(language, "progress_loading_existing_output"))
+        try:
+            resume_state = _resolve_tile_resume_source(
+                run_dir,
+                fg_video_path,
+                alpha_video_path,
+            )
+        except ValueError as exc:
+            raise gr.Error(str(exc)) from exc
+
+        metadata = resume_state["metadata"]
+        info_text = _build_video_info_text(metadata, language)
+        status_lines = [
+            _ui_text(language, "status_loaded_existing_output"),
+            _ui_text(language, "status_resume_foreground", value=resume_state["fg_video_path"]),
+            _ui_text(language, "status_resume_alpha", value=resume_state["alpha_video_path"]),
+        ]
+        if resume_state.get("run_dir"):
+            status_lines.insert(
+                1,
+                _ui_text(language, "status_resume_run_dir", value=resume_state["run_dir"]),
+            )
+        if resume_state.get("existing_webp"):
+            status_lines.append(
+                _ui_text(language, "status_resume_existing_webp", value=resume_state["existing_webp"])
+            )
+        if resume_state.get("existing_gif"):
+            status_lines.append(
+                _ui_text(language, "status_resume_existing_gif", value=resume_state["existing_gif"])
+            )
+        _push_progress(progress, 1.0, _ui_text(language, "progress_video_ready"))
+        return (
+            resume_state,
+            gr.update(value=resume_state["fg_video_path"], visible=True),
+            gr.update(value=resume_state["alpha_video_path"], visible=True),
+            gr.update(value=info_text, visible=True),
+            gr.update(value="", visible=False),
+            gr.update(value="", visible=False),
+            gr.update(value="\n".join(status_lines)),
+            gr.update(interactive=True),
+        )
+
     def get_frames_from_image_v2(
         image_input: np.ndarray,
         image_state: dict,
@@ -1693,94 +2075,6 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             ),
         )
 
-    def _render_tile_animation_outputs(
-        foreground: list[Any],
-        alpha: list[Any],
-        tile_layout: str,
-        source_fps: float,
-        export_fps: int,
-        export_max_frames: int,
-        export_bounce: bool,
-        output_dir: str | Path,
-        output_stem: str,
-        target_size: tuple[int, int] | None,
-    ) -> tuple[str, list[str], list[str]]:
-        tile_foreground_sequences = _split_frame_sequence_into_tiles(foreground, tile_layout)
-        tile_alpha_sequences = _split_frame_sequence_into_tiles(alpha, tile_layout)
-        if len(tile_foreground_sequences) != len(tile_alpha_sequences):
-            raise ValueError("Foreground and alpha tiles do not match.")
-
-        tile_sizes = _split_size_into_tiles(target_size, tile_layout)
-        if tile_sizes is None:
-            tile_sizes = [
-                (int(tile_frames[0].shape[1]), int(tile_frames[0].shape[0]))
-                for tile_frames in tile_foreground_sequences
-            ]
-
-        safe_export_fps = max(1, int(export_fps))
-        frame_skip = 1
-        output_fps = float(safe_export_fps)
-        if source_fps and source_fps > 0:
-            frame_skip = max(1, int(round(float(source_fps) / safe_export_fps)))
-            output_fps = float(source_fps) / frame_skip
-
-        max_frames = _safe_max_frames(export_max_frames)
-        tile_output_dir = Path(output_dir) / f"{output_stem}_{tile_layout}_tiles"
-        tile_output_dir.mkdir(parents=True, exist_ok=True)
-
-        tile_webp_outputs: list[str] = []
-        tile_gif_outputs: list[str] = []
-        for tile_index, (tile_foreground_frames, tile_alpha_frames) in enumerate(
-            zip(tile_foreground_sequences, tile_alpha_sequences),
-            start=1,
-        ):
-            rgba_frames: list[Image.Image] = []
-            sampled_count = 0
-            output_size = tile_sizes[tile_index - 1] if tile_index - 1 < len(tile_sizes) else None
-            for frame_index, (fg_frame, alpha_frame) in enumerate(zip(tile_foreground_frames, tile_alpha_frames)):
-                if frame_index % frame_skip != 0:
-                    continue
-                rgba_frame = remover._combine_matanyone_frames(
-                    fg_frame,
-                    alpha_frame,
-                    output_size=output_size,
-                )
-                rgba_frames.append(Image.fromarray(rgba_frame))
-                sampled_count += 1
-                if max_frames and sampled_count >= max_frames:
-                    break
-
-            if not rgba_frames:
-                continue
-
-            if export_bounce and len(rgba_frames) > 1:
-                rgba_frames = rgba_frames + rgba_frames[-2:0:-1]
-
-            duration_ms = max(1, int(round(1000 / max(output_fps, 0.01))))
-            tile_prefix = tile_output_dir / f"{output_stem}_tile_{tile_index:02d}"
-            webp_output = str(tile_prefix.with_name(f"{tile_prefix.name}_animated.webp"))
-            gif_output = str(tile_prefix.with_name(f"{tile_prefix.name}_animated.gif"))
-
-            rgba_frames[0].save(
-                webp_output,
-                format="WEBP",
-                save_all=True,
-                append_images=rgba_frames[1:],
-                duration=duration_ms,
-                loop=0,
-                lossless=False,
-                quality=85,
-            )
-            remover._save_animated_gif(
-                rgba_frames,
-                gif_output,
-                duration_ms=duration_ms,
-            )
-            tile_webp_outputs.append(webp_output)
-            tile_gif_outputs.append(gif_output)
-
-        return str(tile_output_dir), tile_webp_outputs, tile_gif_outputs
-
     def video_matting_tile_v2(
         video_state: dict,
         interactive_state: dict,
@@ -1882,11 +2176,11 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             _ui_text(language, "progress_splitting_tiled_outputs", layout=tile_layout),
         )
         stem = Path(video_name).stem
-        tile_output_dir, tile_webp_outputs, tile_gif_outputs = _render_tile_animation_outputs(
-            foreground=foreground,
-            alpha=alpha,
+        tile_output_dir, tile_webp_outputs, tile_gif_outputs = _render_tile_animation_outputs_from_pair(
+            remover=remover,
+            fg_video_path=foreground_output,
+            alpha_video_path=alpha_output,
             tile_layout=tile_layout,
-            source_fps=fps,
             export_fps=export_fps,
             export_max_frames=export_max_frames,
             export_bounce=export_bounce,
@@ -1910,17 +2204,23 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             )
             for index, output_path in enumerate(tile_gif_outputs, start=1)
         ]
+        combined_preview_html = _build_preview_sections_html(
+            [
+                (_ui_text(language, "preview_title_webp"), webp_preview_items),
+                (_ui_text(language, "preview_title_gif"), gif_preview_items),
+            ]
+        )
         _push_progress(progress, 1.0, _ui_text(language, "progress_video_matting_complete"))
         yield (
             gr.update(value=foreground_output, visible=True),
             gr.update(value=alpha_output, visible=True),
             gr.update(
-                value=_build_preview_gallery_html(webp_preview_items),
-                visible=bool(webp_preview_items),
+                value=combined_preview_html,
+                visible=bool(combined_preview_html),
             ),
             gr.update(
-                value=_build_preview_gallery_html(gif_preview_items),
-                visible=bool(gif_preview_items),
+                value="",
+                visible=False,
             ),
             gr.update(
                 value=_ui_text(
@@ -1932,6 +2232,103 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                     tile_count=len(tile_webp_outputs),
                     tile_dir=tile_output_dir,
                     debug_dir=debug_dir,
+                )
+            ),
+        )
+
+    def render_existing_tile_exports_v2(
+        resume_state: dict,
+        tile_layout: str,
+        export_fps: int,
+        export_max_frames: int,
+        export_bounce: bool,
+        language: str,
+        progress=gr.Progress(track_tqdm=True),
+    ):
+        fg_video_path = str(resume_state.get("fg_video_path") or "").strip()
+        alpha_video_path = str(resume_state.get("alpha_video_path") or "").strip()
+        if not fg_video_path:
+            raise gr.Error(_ui_text(language, "error_resume_existing_output_first"))
+
+        yield (
+            gr.update(),
+            gr.update(),
+            gr.update(value="", visible=False),
+            gr.update(value="", visible=False),
+            gr.update(value=_ui_text(language, "status_preparing_tile_resume_exports")),
+        )
+        _push_progress(progress, 0.2, _ui_text(language, "progress_loading_existing_output"))
+        source_run_dir = resume_state.get("run_dir")
+        output_dir = create_run_output_dir(
+            str(results_root / "matanyone2_tile_resume"),
+            {"video_name": Path(fg_video_path).stem},
+        )
+        output_stem = str(resume_state.get("video_name") or Path(fg_video_path).stem)
+        source_size = resume_state.get("source_size")
+        _push_progress(
+            progress,
+            0.55,
+            _ui_text(language, "progress_splitting_tiled_outputs", layout=tile_layout),
+        )
+        tile_output_dir, tile_webp_outputs, tile_gif_outputs = _render_tile_animation_outputs_from_pair(
+            remover=remover,
+            fg_video_path=fg_video_path,
+            alpha_video_path=alpha_video_path,
+            tile_layout=tile_layout,
+            export_fps=export_fps,
+            export_max_frames=export_max_frames,
+            export_bounce=export_bounce,
+            output_dir=output_dir,
+            output_stem=output_stem,
+            target_size=source_size,
+        )
+        _push_progress(progress, 0.95, _ui_text(language, "progress_rendering_tiled_webp_gif"))
+        webp_preview_items = [
+            (
+                f"{_ui_text(language, 'preview_title_webp')} / {_ui_text(language, 'tile_label', index=index)}",
+                output_path,
+            )
+            for index, output_path in enumerate(tile_webp_outputs, start=1)
+        ]
+        gif_preview_items = [
+            (
+                f"{_ui_text(language, 'preview_title_gif')} / {_ui_text(language, 'tile_label', index=index)}",
+                output_path,
+            )
+            for index, output_path in enumerate(tile_gif_outputs, start=1)
+        ]
+        combined_preview_html = _build_preview_sections_html(
+            [
+                (_ui_text(language, "preview_title_webp"), webp_preview_items),
+                (_ui_text(language, "preview_title_gif"), gif_preview_items),
+            ]
+        )
+        _push_progress(progress, 1.0, _ui_text(language, "progress_video_matting_complete"))
+        yield (
+            gr.update(value=fg_video_path, visible=True),
+            gr.update(value=alpha_video_path, visible=True),
+            gr.update(
+                value=combined_preview_html,
+                visible=bool(combined_preview_html),
+            ),
+            gr.update(
+                value="",
+                visible=False,
+            ),
+            gr.update(
+                value=_ui_text(
+                    language,
+                    "status_matanyone_tile_resume_done",
+                    foreground=fg_video_path,
+                    alpha=alpha_video_path,
+                    layout=tile_layout,
+                    tile_count=len(tile_webp_outputs),
+                    tile_dir=tile_output_dir,
+                )
+                + (
+                    f"\n{_ui_text(language, 'status_resume_run_dir', value=source_run_dir)}"
+                    if source_run_dir
+                    else ""
                 )
             ),
         )
@@ -2048,6 +2445,10 @@ def _launch_in_process(args: argparse.Namespace) -> int:
         """Reset the tiled MatAnyone2 video tab for a new input."""
         outputs = list(restart_video_v2(language))
         outputs[-1] = gr.update(value=_ui_text(language, "matanyone_tile_idle_status"))
+        outputs.extend([
+            {},
+            gr.update(interactive=False),
+        ])
         return tuple(outputs)
 
     def restart_v2():
@@ -2235,6 +2636,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
 
     def run_cli_export(
         source_mode: str,
+        output_root_dir: str,
         upload_input_path: str | None,
         manual_input_path: str,
         upload_alpha_path: str | None,
@@ -2285,7 +2687,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
 
         alpha_path = _resolve_preferred_path(upload_alpha_path, manual_alpha_path)
         output_path_value = (output_path_text or "").strip()
-        base_dir = results_root / "cli_runs" / _timestamp_token()
+        base_dir = results_root / output_root_dir / _timestamp_token()
         if not output_path_value:
             output_path_value = _build_cli_output_target(
                 base_dir,
@@ -2432,6 +2834,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
         *,
         tab_label_key: str,
         source_mode_value: str,
+        output_root_dir: str,
         description_key: str,
         manual_input_placeholder: str,
         examples: list[list[Any]],
@@ -2451,6 +2854,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             )
 
             source_mode_state = gr.State(source_mode_value)
+            output_root_state = gr.State(output_root_dir)
 
             with gr.Row():
                 cli_export_mode = gr.Radio(
@@ -2508,13 +2912,13 @@ def _launch_in_process(args: argparse.Namespace) -> int:
 
             cli_output_path = gr.Textbox(
                 label=_ui_text(default_language, "output_path_label"),
-                placeholder=_ui_text(default_language, "output_path_placeholder"),
+                placeholder=_build_output_path_placeholder(output_root_dir, default_language),
             )
             register_language_target(
                 cli_output_path,
                 lambda lang, _meta, _ratio: gr.update(
                     label=_ui_text(lang, "output_path_label"),
-                    placeholder=_ui_text(lang, "output_path_placeholder"),
+                    placeholder=_build_output_path_placeholder(output_root_dir, lang),
                 ),
             )
 
@@ -2727,6 +3131,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                 fn=run_cli_export,
                 inputs=[
                     source_mode_state,
+                    output_root_state,
                     cli_input_upload,
                     cli_input_path,
                     cli_alpha_upload,
@@ -2879,6 +3284,18 @@ def _launch_in_process(args: argparse.Namespace) -> int:
     }
     .vbr-status-box textarea {
       border-color: rgba(217, 119, 6, 0.22) !important;
+    }
+    .ma2-preview-sections {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      width: 100%;
+    }
+    .ma2-preview-section-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      margin-bottom: 12px;
+      color: #9a3412;
     }
     .ma2-preview-grid {
       display: grid;
@@ -3237,6 +3654,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             build_cli_export_tab(
                 tab_label_key="tab_advanced_rembg",
                 source_mode_value="regular",
+                output_root_dir="advanced_rembg",
                 description_key="advanced_rembg_desc",
                 manual_input_placeholder=r"D:\path\to\input.mp4",
                 examples=advanced_rembg_examples,
@@ -4181,6 +4599,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                     "working_size": None,
                     "performance_profile": args.performance_profile,
                 })
+                ma2_tile_resume_state = gr.State({})
 
                 with gr.Group():
                     with gr.Row():
@@ -4298,6 +4717,30 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                                     interactive=False,
                                 )
 
+                    ma2_tile_resume_hint_markdown = gr.Markdown(_ui_text(default_language, "matanyone_tile_resume_hint"))
+                    with gr.Accordion(_ui_text(default_language, "resume_tile_header"), open=False) as ma2_tile_resume_accordion:
+                        ma2_tile_resume_description_markdown = gr.Markdown(
+                            _ui_text(default_language, "resume_tile_description")
+                        )
+                        with gr.Row():
+                            ma2_tile_resume_run_dir = gr.Textbox(
+                                label=_ui_text(default_language, "resume_run_dir_label"),
+                                placeholder=_ui_text(default_language, "resume_run_dir_placeholder"),
+                            )
+                        with gr.Row():
+                            ma2_tile_resume_fg_path = gr.Textbox(
+                                label=_ui_text(default_language, "resume_fg_path_label"),
+                                placeholder=_ui_text(default_language, "resume_fg_path_placeholder"),
+                            )
+                            ma2_tile_resume_alpha_path = gr.Textbox(
+                                label=_ui_text(default_language, "resume_alpha_path_label"),
+                                placeholder=_ui_text(default_language, "resume_alpha_path_placeholder"),
+                            )
+                        ma2_tile_load_existing_button = gr.Button(
+                            value=_ui_text(default_language, "load_existing_output_button"),
+                            interactive=True,
+                        )
+
                     gr.Markdown("---")
                     with gr.Accordion(_ui_text(default_language, "animated_output_settings"), open=True) as ma2_tile_animated_output_settings:
                         ma2_tile_settings_hint_markdown = gr.Markdown(
@@ -4335,6 +4778,10 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                                 info=_ui_text(default_language, "info_bounce_loop"),
                                 interactive=True,
                             )
+                        ma2_tile_render_existing_button = gr.Button(
+                            value=_ui_text(default_language, "render_tile_exports_button"),
+                            interactive=False,
+                        )
 
                     gr.Markdown("---")
 
@@ -4375,6 +4822,18 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                     ma2_tile_step2_title,
                     lambda lang, _meta, _ratio: gr.update(value=_ui_text(lang, "step2_add_masks")),
                 )
+                register_language_target(
+                    ma2_tile_resume_hint_markdown,
+                    lambda lang, _meta, _ratio: gr.update(value=_ui_text(lang, "matanyone_tile_resume_hint")),
+                )
+                register_language_target(
+                    ma2_tile_resume_accordion,
+                    lambda lang, _meta, _ratio: gr.update(label=_ui_text(lang, "resume_tile_header")),
+                )
+                register_language_target(
+                    ma2_tile_resume_description_markdown,
+                    lambda lang, _meta, _ratio: gr.update(value=_ui_text(lang, "resume_tile_description")),
+                )
                 for component, key in [
                     (ma2_tile_model_selection, "label_model_selection"),
                     (ma2_tile_performance_profile, "performance_profile_label"),
@@ -4392,6 +4851,9 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                     (ma2_tile_export_fps, "export_fps_label"),
                     (ma2_tile_export_max_frames, "label_max_frames_simple"),
                     (ma2_tile_layout, "tile_layout_label"),
+                    (ma2_tile_resume_run_dir, "resume_run_dir_label"),
+                    (ma2_tile_resume_fg_path, "resume_fg_path_label"),
+                    (ma2_tile_resume_alpha_path, "resume_alpha_path_label"),
                 ]:
                     register_language_target(
                         component,
@@ -4453,6 +4915,8 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                     (ma2_tile_add_mask_button, "add_mask_button"),
                     (ma2_tile_remove_mask_button, "remove_masks_button"),
                     (ma2_tile_video_matting_button, "tile_video_matting_button"),
+                    (ma2_tile_load_existing_button, "load_existing_output_button"),
+                    (ma2_tile_render_existing_button, "render_tile_exports_button"),
                 ]:
                     register_language_target(
                         component,
@@ -4471,6 +4935,27 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                     lambda lang, _meta, _ratio: gr.update(
                         label=_ui_text(lang, "tile_layout_label"),
                         info=_ui_text(lang, "tile_layout_info"),
+                    ),
+                )
+                register_language_target(
+                    ma2_tile_resume_run_dir,
+                    lambda lang, _meta, _ratio: gr.update(
+                        label=_ui_text(lang, "resume_run_dir_label"),
+                        placeholder=_ui_text(lang, "resume_run_dir_placeholder"),
+                    ),
+                )
+                register_language_target(
+                    ma2_tile_resume_fg_path,
+                    lambda lang, _meta, _ratio: gr.update(
+                        label=_ui_text(lang, "resume_fg_path_label"),
+                        placeholder=_ui_text(lang, "resume_fg_path_placeholder"),
+                    ),
+                )
+                register_language_target(
+                    ma2_tile_resume_alpha_path,
+                    lambda lang, _meta, _ratio: gr.update(
+                        label=_ui_text(lang, "resume_alpha_path_label"),
+                        placeholder=_ui_text(lang, "resume_alpha_path_placeholder"),
                     ),
                 )
                 register_language_target(
@@ -4523,6 +5008,8 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                     ma2_tile_webp_preview,
                     ma2_tile_gif_preview,
                     ma2_tile_status,
+                    ma2_tile_resume_state,
+                    ma2_tile_render_existing_button,
                 ]
 
                 ma2_tile_load_video_button.click(
@@ -4548,6 +5035,12 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                         ma2_tile_status,
                     ],
                     show_progress="full",
+                )
+                ma2_tile_load_video_button.click(
+                    fn=lambda: ({}, gr.update(interactive=False)),
+                    outputs=[ma2_tile_resume_state, ma2_tile_render_existing_button],
+                    queue=False,
+                    show_progress=False,
                 )
 
                 ma2_tile_start_frame.release(
@@ -4616,11 +5109,64 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                     show_progress="full",
                 )
 
+                ma2_tile_load_existing_button.click(
+                    fn=load_tile_resume_output_v2,
+                    inputs=[
+                        ma2_tile_resume_run_dir,
+                        ma2_tile_resume_fg_path,
+                        ma2_tile_resume_alpha_path,
+                        ui_language,
+                    ],
+                    outputs=[
+                        ma2_tile_resume_state,
+                        ma2_tile_foreground_output,
+                        ma2_tile_alpha_output,
+                        ma2_tile_info,
+                        ma2_tile_webp_preview,
+                        ma2_tile_gif_preview,
+                        ma2_tile_status,
+                        ma2_tile_render_existing_button,
+                    ],
+                    show_progress="full",
+                )
+
+                ma2_tile_render_existing_button.click(
+                    fn=render_existing_tile_exports_v2,
+                    inputs=[
+                        ma2_tile_resume_state,
+                        ma2_tile_layout,
+                        ma2_tile_export_fps,
+                        ma2_tile_export_max_frames,
+                        ma2_tile_export_bounce,
+                        ui_language,
+                    ],
+                    outputs=[
+                        ma2_tile_foreground_output,
+                        ma2_tile_alpha_output,
+                        ma2_tile_webp_preview,
+                        ma2_tile_gif_preview,
+                        ma2_tile_status,
+                    ],
+                    show_progress="full",
+                )
+
                 ma2_tile_mask_dropdown.change(
                     fn=show_mask_v2,
                     inputs=[ma2_tile_state, ma2_tile_interactive_state, ma2_tile_mask_dropdown],
                     outputs=[ma2_tile_template_frame],
                 )
+
+                for component in [
+                    ma2_tile_resume_run_dir,
+                    ma2_tile_resume_fg_path,
+                    ma2_tile_resume_alpha_path,
+                ]:
+                    component.change(
+                        fn=lambda: ({}, gr.update(interactive=False)),
+                        outputs=[ma2_tile_resume_state, ma2_tile_render_existing_button],
+                        queue=False,
+                        show_progress=False,
+                    )
 
                 ma2_tile_input.change(
                     fn=restart_tile_video_v2,
@@ -4650,6 +5196,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             build_cli_export_tab(
                 tab_label_key="tab_advanced_pair",
                 source_mode_value="matanyone_pair",
+                output_root_dir="advanced_pair",
                 description_key="advanced_pair_desc",
                 manual_input_placeholder=r"D:\path\to\clip_fg.mp4 or D:\path\to\MatAnyone_dir",
                 examples=cli_examples_by_mode["matanyone_pair"],

@@ -1,6 +1,8 @@
+import json
 from pathlib import Path
 import os
 import sys
+import tempfile
 import unittest
 
 import numpy as np
@@ -14,12 +16,16 @@ if str(SRC) not in sys.path:
 from video_background_remover_cli.webui import (
     INTERNAL_LAUNCH_FLAG,
     _build_advanced_rembg_examples,
+    _build_output_path_placeholder,
+    _build_preview_sections_html,
     _build_resize_ratio_text,
     _build_video_info_text,
     _build_cli_output_target,
     _collect_existing_example_paths,
     _compute_scaled_dimensions,
+    _discover_matanyone_run_artifacts,
     _parse_points_text,
+    _resolve_tile_resume_source,
     _split_frame_sequence_into_tiles,
     _split_size_into_tiles,
     _ui_text,
@@ -156,6 +162,31 @@ class CliHelperTests(unittest.TestCase):
         self.assertEqual(_ui_text("en", "tab_matanyone2_tile"), "MatAnyone2 Tile")
         self.assertEqual(_ui_text("ja", "tab_matanyone2_tile"), "MatAnyone2 Tile")
 
+    def test_build_output_path_placeholder_uses_requested_folder(self) -> None:
+        self.assertEqual(
+            _build_output_path_placeholder("advanced_pair", "en"),
+            "Leave blank to auto-save under output\\webui\\advanced_pair",
+        )
+
+    def test_build_preview_sections_html_renders_both_sections(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            webp_path = Path(tmpdir) / "tile_01_animated.webp"
+            gif_path = Path(tmpdir) / "tile_01_animated.gif"
+            webp_path.write_bytes(b"webp")
+            gif_path.write_bytes(b"gif")
+
+            html = _build_preview_sections_html(
+                [
+                    ("Animated WebP", [("Animated WebP / Tile 01", str(webp_path))]),
+                    ("Animated GIF", [("Animated GIF / Tile 01", str(gif_path))]),
+                ]
+            )
+
+        self.assertIn("Animated WebP", html)
+        self.assertIn("Animated GIF", html)
+        self.assertIn("tile_01_animated.webp", html)
+        self.assertIn("tile_01_animated.gif", html)
+
     def test_collect_existing_example_paths_filters_missing_files(self) -> None:
         paths = _collect_existing_example_paths(
             ROOT / "assets" / "star-cat2.mp4",
@@ -195,6 +226,45 @@ class CliHelperTests(unittest.TestCase):
         self.assertTrue(np.array_equal(tiles[1][0], frames[0][:2, 3:]))
         self.assertTrue(np.array_equal(tiles[2][0], frames[0][2:, :3]))
         self.assertTrue(np.array_equal(tiles[3][0], frames[0][2:, 3:]))
+
+    def test_discover_matanyone_run_artifacts_detects_existing_animation_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir = Path(tmpdir)
+            (run_dir / "clip_animated.webp").write_bytes(b"webp")
+            (run_dir / "clip_animated.gif").write_bytes(b"gif")
+
+            artifacts = _discover_matanyone_run_artifacts(str(run_dir))
+
+            self.assertEqual(artifacts["existing_webp"], str(run_dir / "clip_animated.webp"))
+            self.assertEqual(artifacts["existing_gif"], str(run_dir / "clip_animated.gif"))
+
+    def test_resolve_tile_resume_source_from_run_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir = Path(tmpdir)
+            fg_path = run_dir / "clip_fg.mp4"
+            alpha_path = run_dir / "clip_alpha.mp4"
+            fg_path.write_bytes(b"fg")
+            alpha_path.write_bytes(b"alpha")
+            metadata = {
+                "source_size": [640, 360],
+                "num_output_frames": 24,
+                "fps": 12.0,
+                "source_name": "clip.mp4",
+                "width": 640,
+                "height": 360,
+            }
+            (run_dir / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+            (run_dir / "clip_animated.gif").write_bytes(b"gif")
+
+            resolved = _resolve_tile_resume_source(str(run_dir), None, None)
+
+            self.assertEqual(resolved["run_dir"], str(run_dir))
+            self.assertEqual(resolved["fg_video_path"], str(fg_path))
+            self.assertEqual(resolved["alpha_video_path"], str(alpha_path))
+            self.assertEqual(resolved["source_size"], (640, 360))
+            self.assertEqual(resolved["metadata"]["width"], 640)
+            self.assertEqual(resolved["metadata"]["height"], 360)
+            self.assertEqual(resolved["existing_gif"], str(run_dir / "clip_animated.gif"))
 
 
 class WebUiExampleTests(unittest.TestCase):

@@ -1150,6 +1150,19 @@ def _build_preview_gallery_html(previews: list[tuple[str, str | None]]) -> str:
     return f'<div class="ma2-preview-grid">{"".join(cards)}</div>'
 
 
+def _build_dual_preview_gallery_html(
+    language: str,
+    webp_path: str | None,
+    gif_path: str | None,
+) -> str:
+    return _build_preview_gallery_html(
+        [
+            (_ui_text(language, "preview_title_webp"), webp_path),
+            (_ui_text(language, "preview_title_gif"), gif_path),
+        ]
+    )
+
+
 def _build_preview_sections_html(
     sections: list[tuple[str, list[tuple[str, str | None]]]],
 ) -> str:
@@ -2595,8 +2608,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                 value=_build_resize_ratio_text(None, 1.0, language),
                 visible=True,
             ),
-            gr.update(value="", visible=False),
-            gr.update(value="", visible=False),
+            gr.update(value=""),
             gr.update(value=_ui_text(language, "mp4_idle_status")),
             gr.update(interactive=False),
         )
@@ -2623,8 +2635,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                 value=_build_resize_ratio_text(metadata, resize_ratio, language),
                 visible=True,
             ),
-            gr.update(value="", visible=False),
-            gr.update(value="", visible=False),
+            gr.update(value=""),
             gr.update(value=_ui_text(language, "mp4_ready_status")),
             gr.update(interactive=True),
         )
@@ -2652,8 +2663,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             raise gr.Error(_ui_text(language, "error_upload_mp4_first"))
 
         yield (
-            gr.update(value="", visible=False),
-            gr.update(value="", visible=False),
+            gr.update(value=""),
             gr.update(value=_ui_text(language, "progress_preparing_direct_conversion")),
         )
 
@@ -2726,16 +2736,14 @@ def _launch_in_process(args: argparse.Namespace) -> int:
         if Path(gif_output).exists():
             status_lines.append(_ui_text(language, "status_gif_output", value=gif_output))
 
+        preview_html = _build_dual_preview_gallery_html(
+            language,
+            webp_output,
+            gif_output,
+        )
         _push_progress(progress, 1.0, _ui_text(language, "progress_direct_conversion_complete"))
         yield (
-            gr.update(
-                value=_build_preview_download_html(_ui_text(language, "preview_title_webp"), webp_output),
-                visible=Path(webp_output).exists(),
-            ),
-            gr.update(
-                value=_build_preview_download_html(_ui_text(language, "preview_title_gif"), gif_output),
-                visible=Path(gif_output).exists(),
-            ),
+            gr.update(value=preview_html),
             gr.update(value="\n".join(status_lines)),
         )
 
@@ -3682,9 +3690,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                 gr.Markdown("---")
                 mp4_step3_markdown = gr.Markdown(_ui_text(default_language, "step3_preview_download"))
                 mp4_preview_hint_markdown = gr.Markdown(_ui_text(default_language, "mp4_preview_hint"))
-                with gr.Row():
-                    mp4_converter_webp_preview = gr.HTML(visible=False)
-                    mp4_converter_gif_preview = gr.HTML(visible=False)
+                mp4_converter_preview_gallery = gr.HTML("")
                 register_language_target(
                     mp4_step3_markdown,
                     lambda lang, _meta, _ratio: gr.update(value=_ui_text(lang, "step3_preview_download")),
@@ -3698,8 +3704,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                     mp4_converter_state,
                     mp4_converter_info,
                     mp4_converter_resize_preview,
-                    mp4_converter_webp_preview,
-                    mp4_converter_gif_preview,
+                    mp4_converter_preview_gallery,
                     mp4_converter_status,
                     mp4_converter_convert_button,
                 ]
@@ -3730,8 +3735,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                         ui_language,
                     ],
                     outputs=[
-                        mp4_converter_webp_preview,
-                        mp4_converter_gif_preview,
+                        mp4_converter_preview_gallery,
                         mp4_converter_status,
                     ],
                     show_progress="full",

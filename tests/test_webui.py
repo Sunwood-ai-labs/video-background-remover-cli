@@ -16,6 +16,7 @@ if str(SRC) not in sys.path:
 from video_background_remover_cli.webui import (
     INTERNAL_LAUNCH_FLAG,
     _build_advanced_rembg_examples,
+    _build_dual_preview_gallery_html,
     _build_single_path_examples,
     _build_output_path_placeholder,
     _build_preview_sections_html,
@@ -207,6 +208,21 @@ class CliHelperTests(unittest.TestCase):
         self.assertIn("Animated GIF", html)
         self.assertIn("tile_01_animated.webp", html)
         self.assertIn("tile_01_animated.gif", html)
+
+    def test_build_dual_preview_gallery_html_renders_webp_and_gif_cards(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            webp_path = Path(tmpdir) / "clip_animated.webp"
+            gif_path = Path(tmpdir) / "clip_animated.gif"
+            webp_path.write_bytes(b"webp")
+            gif_path.write_bytes(b"gif")
+
+            html = _build_dual_preview_gallery_html("en", str(webp_path), str(gif_path))
+
+        self.assertIn("Animated WebP", html)
+        self.assertIn("Animated GIF", html)
+        self.assertIn("clip_animated.webp", html)
+        self.assertIn("clip_animated.gif", html)
+        self.assertIn("ma2-preview-grid", html)
 
     def test_collect_existing_example_paths_filters_missing_files(self) -> None:
         paths = _collect_existing_example_paths(

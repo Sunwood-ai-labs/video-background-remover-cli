@@ -41,3 +41,4 @@
 
 - [GitHub release for v0.3.0](https://github.com/Sunwood-ai-labs/video-background-remover-cli/releases/tag/v0.3.0)
 - [CHANGELOG.md](https://github.com/Sunwood-ai-labs/video-background-remover-cli/blob/main/CHANGELOG.md)
+- [記事: Gradio WebUI が主役になったリリース](/ja/guide/articles/v0-3-0-gradio-webui)

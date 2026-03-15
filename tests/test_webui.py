@@ -3,6 +3,8 @@ import os
 import sys
 import unittest
 
+import numpy as np
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -18,6 +20,8 @@ from video_background_remover_cli.webui import (
     _collect_existing_example_paths,
     _compute_scaled_dimensions,
     _parse_points_text,
+    _split_frame_sequence_into_tiles,
+    _split_size_into_tiles,
     _ui_text,
     build_external_launch_command,
     build_pythonpath,
@@ -148,6 +152,10 @@ class CliHelperTests(unittest.TestCase):
     def test_ui_text_falls_back_to_default_language_for_unknown_language(self) -> None:
         self.assertEqual(_ui_text("xx", "app_title"), _ui_text("ja", "app_title"))
 
+    def test_ui_text_exposes_tile_tab_labels(self) -> None:
+        self.assertEqual(_ui_text("en", "tab_matanyone2_tile"), "MatAnyone2 Tile")
+        self.assertEqual(_ui_text("ja", "tab_matanyone2_tile"), "MatAnyone2 Tile")
+
     def test_collect_existing_example_paths_filters_missing_files(self) -> None:
         paths = _collect_existing_example_paths(
             ROOT / "assets" / "star-cat2.mp4",
@@ -163,6 +171,30 @@ class CliHelperTests(unittest.TestCase):
         for example in examples:
             self.assertEqual(len(example), 7)
             self.assertTrue(Path(example[1]).exists(), example[1])
+
+    def test_split_size_into_tiles_for_2x2(self) -> None:
+        self.assertEqual(
+            _split_size_into_tiles((1920, 1080), "2x2"),
+            [(960, 540), (960, 540), (960, 540), (960, 540)],
+        )
+
+    def test_split_frame_sequence_into_tiles_preserves_tile_order(self) -> None:
+        frames = [
+            np.arange(4 * 6 * 3, dtype=np.uint8).reshape(4, 6, 3),
+            (np.arange(4 * 6 * 3, dtype=np.uint8).reshape(4, 6, 3) + 1) % 255,
+        ]
+
+        tiles = _split_frame_sequence_into_tiles(frames, "2x2")
+
+        self.assertEqual(len(tiles), 4)
+        for tile_frames in tiles:
+            self.assertEqual(len(tile_frames), 2)
+            self.assertEqual(tile_frames[0].shape, (2, 3, 3))
+
+        self.assertTrue(np.array_equal(tiles[0][0], frames[0][:2, :3]))
+        self.assertTrue(np.array_equal(tiles[1][0], frames[0][:2, 3:]))
+        self.assertTrue(np.array_equal(tiles[2][0], frames[0][2:, :3]))
+        self.assertTrue(np.array_equal(tiles[3][0], frames[0][2:, 3:]))
 
 
 class WebUiExampleTests(unittest.TestCase):

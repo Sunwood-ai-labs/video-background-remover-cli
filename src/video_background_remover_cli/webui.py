@@ -58,12 +58,14 @@ UI_TEXT: dict[str, dict[str, str]] = {
             "### Mission\n"
             "This app focuses on removing video backgrounds and exporting `webp` / `gif`.\n\n"
             "Use `MatAnyone2 > Video` for the main matting workflow. Use `MP4 -> WebP/GIF` "
-            "for direct animation conversion without matting. The advanced tabs remain "
-            "available for power-user export cases."
+            "for direct animation conversion without matting. Use `MatAnyone2 Tile` for "
+            "2x2 / 3x3 tiled videos that should be split before animated export. The "
+            "advanced tabs remain available for power-user export cases."
         ),
         "tab_mp4_converter": "MP4 -> WebP/GIF",
         "tab_advanced_rembg": "Advanced rembg",
         "tab_matanyone2": "MatAnyone2",
+        "tab_matanyone2_tile": "MatAnyone2 Tile",
         "tab_advanced_backend": "Advanced backend",
         "tab_advanced_pair": "Advanced fg+alpha pair",
         "tab_video": "Video",
@@ -206,6 +208,15 @@ UI_TEXT: dict[str, dict[str, str]] = {
             "The `Video` sub-tab is the main route. The other sub-tabs are advanced helpers for image work, "
             "batch backend runs, or converting an existing foreground/alpha pair."
         ),
+        "matanyone_tile_header": "### MatAnyone2 Tile",
+        "matanyone_tile_description": (
+            "Use this tab for tiled 2x2 or 3x3 videos. It follows the interactive MatAnyone2 "
+            "workflow, then splits the tiled result before generating animated `webp` / `gif`."
+        ),
+        "matanyone_tile_description_2": (
+            "Choose the tile layout that matches your input video. The full foreground/alpha pair "
+            "is still saved, while the preview area shows one animated export per tile."
+        ),
         "matting_settings_label": "Matting Settings",
         "label_model_selection": "Model Selection",
         "info_choose_model": "Choose the model to use for matting",
@@ -236,6 +247,7 @@ UI_TEXT: dict[str, dict[str, str]] = {
         "remove_masks_button": "Remove Masks",
         "video_matting_button": "Video Matting",
         "image_matting_button": "Image Matting",
+        "tile_video_matting_button": "Tile Video Matting",
         "foreground_output_label": "Foreground Output",
         "alpha_output_label": "Alpha Output",
         "matanyone_video_idle_status": (
@@ -256,6 +268,23 @@ UI_TEXT: dict[str, dict[str, str]] = {
         "matanyone_video_preview_hint": (
             "After `Video Matting` finishes, both animated files appear here with previews and direct download buttons."
         ),
+        "tile_layout_label": "Tile Layout",
+        "tile_layout_info": "Choose how the input video is tiled before animated export.",
+        "matanyone_tile_idle_status": (
+            "Idle. Load a tiled video, choose 2x2 or 3x3, add a mask, then run Tile Video Matting. "
+            "Split tile WebP and GIF downloads will appear here after processing."
+        ),
+        "matanyone_tile_loaded_status": (
+            "Video loaded. Choose the matching tile layout, add a positive point, save a mask, and "
+            "run Tile Video Matting. When matting finishes, this tab will generate split tile WebP and GIF files."
+        ),
+        "matanyone_tile_settings_hint": (
+            "These settings are applied after matting. This tab splits the tiled foreground/alpha result "
+            "before generating animated `webp` and `gif` files for each tile."
+        ),
+        "matanyone_tile_preview_hint": (
+            "After `Tile Video Matting` finishes, each tile appears below with its own animated preview and download button."
+        ),
         "label_refine_iterations": "Num of Refinement Iterations",
         "info_refine_iterations": "More iterations = More details & More time",
         "default_video_info": "Load a video to prepare the interactive frame.",
@@ -266,21 +295,34 @@ UI_TEXT: dict[str, dict[str, str]] = {
         "error_load_video_first": "Load a video first.",
         "error_load_image_first": "Load an image first.",
         "status_preparing_matting_exports": "Preparing MatAnyone video matting and animated exports...",
+        "status_preparing_tile_matting_exports": "Preparing MatAnyone tiled video matting and split animated exports...",
         "progress_loading_selected_model": "Loading the selected model...",
         "progress_building_selected_mask": "Building the selected mask...",
         "progress_running_video_matting": "Running MatAnyone video matting...",
         "progress_encoding_foreground_alpha": "Encoding foreground and alpha videos...",
         "progress_saving_debug_artifacts": "Saving debug artifacts...",
         "progress_rendering_animated_webp_gif": "Rendering animated WebP and GIF...",
+        "progress_splitting_tiled_outputs": "Splitting tiled outputs into {layout} exports...",
+        "progress_rendering_tiled_webp_gif": "Rendering split tile WebP and GIF exports...",
         "progress_video_matting_complete": "Video matting and animated exports complete",
         "preview_title_webp": "Animated WebP",
         "preview_title_gif": "Animated GIF",
+        "tile_label": "Tile {index:02d}",
         "status_matanyone_video_done": (
             "Done. MatAnyone video matting finished and the animated downloads are ready below.\n"
             "Foreground: {foreground}\n"
             "Alpha: {alpha}\n"
             "WebP: {webp}\n"
             "GIF: {gif}\n"
+            "Debug artifacts: {debug_dir}"
+        ),
+        "status_matanyone_tile_done": (
+            "Done. MatAnyone tiled video matting finished and the split animated downloads are ready below.\n"
+            "Foreground: {foreground}\n"
+            "Alpha: {alpha}\n"
+            "Tile layout: {layout}\n"
+            "Tiles: {tile_count}\n"
+            "Tile outputs: {tile_dir}\n"
             "Debug artifacts: {debug_dir}"
         ),
         "progress_running_image_matting": "Running MatAnyone image matting...",
@@ -318,11 +360,13 @@ UI_TEXT: dict[str, dict[str, str]] = {
             "このアプリの主目的は、動画の背景を切り抜いて `webp` / `gif` に書き出すことです。\n\n"
             "`MatAnyone2 > Video` はメインのマッティング導線です。"
             "`MP4 -> WebP/GIF` はマッティングなしでアニメーション変換したいときに使います。"
+            "`MatAnyone2 Tile` は 2x2 / 3x3 のタイル動画を分割して書き出したいときに使います。"
             "高度なタブは、細かい書き出し設定が必要な場合のために残しています。"
         ),
         "tab_mp4_converter": "MP4 -> WebP/GIF",
         "tab_advanced_rembg": "Advanced rembg",
         "tab_matanyone2": "MatAnyone2",
+        "tab_matanyone2_tile": "MatAnyone2 Tile",
         "tab_advanced_backend": "Advanced backend",
         "tab_advanced_pair": "Advanced fg+alpha pair",
         "tab_video": "動画",
@@ -457,6 +501,15 @@ UI_TEXT: dict[str, dict[str, str]] = {
             "`Video` サブタブが主導線です。ほかのサブタブは画像作業や backend 実行、"
             "既存の foreground/alpha ペア変換などの詳細用途向けです。"
         ),
+        "matanyone_tile_header": "### MatAnyone2 Tile",
+        "matanyone_tile_description": (
+            "このタブは 2x2 / 3x3 のタイル動画向けです。対話型の MatAnyone2 フローでマスクを作ったあと、"
+            "タイルを分割してから animated `webp` / `gif` を生成します。"
+        ),
+        "matanyone_tile_description_2": (
+            "入力動画に合う Tile Layout を選んでください。全体の foreground / alpha ペアも保存しつつ、"
+            "プレビュー欄ではタイルごとのアニメーション出力を確認できます。"
+        ),
         "matting_settings_label": "マッティング設定",
         "label_model_selection": "モデル選択",
         "info_choose_model": "マッティングに使うモデルを選びます",
@@ -487,6 +540,7 @@ UI_TEXT: dict[str, dict[str, str]] = {
         "remove_masks_button": "マスクを削除",
         "video_matting_button": "動画マッティング",
         "image_matting_button": "画像マッティング",
+        "tile_video_matting_button": "Tile 動画マッティング",
         "foreground_output_label": "Foreground 出力",
         "alpha_output_label": "Alpha 出力",
         "matanyone_video_idle_status": (
@@ -507,6 +561,23 @@ UI_TEXT: dict[str, dict[str, str]] = {
         "matanyone_video_preview_hint": (
             "`Video Matting` 完了後に、両方のアニメーションをここでプレビューして直接ダウンロードできます。"
         ),
+        "tile_layout_label": "Tile Layout",
+        "tile_layout_info": "animated 書き出し前に分割するタイル構成を選びます。",
+        "matanyone_tile_idle_status": (
+            "待機中です。タイル動画を読み込み、2x2 または 3x3 を選び、マスクを追加してから "
+            "`Tile Video Matting` を実行してください。処理後にタイルごとの Animated WebP と GIF が表示されます。"
+        ),
+        "matanyone_tile_loaded_status": (
+            "動画を読み込みました。Tile Layout を選び、positive point を置いてマスクを保存してから "
+            "`Tile Video Matting` を実行してください。完了するとタイルごとの Animated WebP と GIF を生成します。"
+        ),
+        "matanyone_tile_settings_hint": (
+            "この設定はマッティング後に適用されます。このタブでは tiled な foreground / alpha を分割してから "
+            "animated `webp` / `gif` を生成します。"
+        ),
+        "matanyone_tile_preview_hint": (
+            "`Tile Video Matting` 完了後に、各タイルのアニメーションをここでプレビューして直接ダウンロードできます。"
+        ),
         "label_refine_iterations": "Refinement 回数",
         "info_refine_iterations": "回数を増やすほど細部が出ますが、時間もかかります",
         "default_video_info": "動画を読み込むと操作フレームを準備します。",
@@ -517,21 +588,34 @@ UI_TEXT: dict[str, dict[str, str]] = {
         "error_load_video_first": "先に動画を読み込んでください。",
         "error_load_image_first": "先に画像を読み込んでください。",
         "status_preparing_matting_exports": "MatAnyone の動画マッティングとアニメーション出力を準備しています...",
+        "status_preparing_tile_matting_exports": "MatAnyone のタイル動画マッティングと分割アニメーション出力を準備しています...",
         "progress_loading_selected_model": "選択したモデルを読み込んでいます...",
         "progress_building_selected_mask": "選択したマスクを組み立てています...",
         "progress_running_video_matting": "MatAnyone の動画マッティングを実行しています...",
         "progress_encoding_foreground_alpha": "Foreground と Alpha 動画をエンコードしています...",
         "progress_saving_debug_artifacts": "デバッグ成果物を保存しています...",
         "progress_rendering_animated_webp_gif": "Animated WebP と GIF を生成しています...",
+        "progress_splitting_tiled_outputs": "{layout} のタイルに分割しています...",
+        "progress_rendering_tiled_webp_gif": "分割したタイルの Animated WebP と GIF を生成しています...",
         "progress_video_matting_complete": "動画マッティングとアニメーション出力が完了しました",
         "preview_title_webp": "Animated WebP",
         "preview_title_gif": "Animated GIF",
+        "tile_label": "Tile {index:02d}",
         "status_matanyone_video_done": (
             "完了しました。MatAnyone の動画マッティングが終わり、アニメーションのダウンロード準備もできています。\n"
             "Foreground: {foreground}\n"
             "Alpha: {alpha}\n"
             "WebP: {webp}\n"
             "GIF: {gif}\n"
+            "Debug artifacts: {debug_dir}"
+        ),
+        "status_matanyone_tile_done": (
+            "完了しました。MatAnyone のタイル動画マッティングが終わり、分割アニメーションのダウンロード準備もできています。\n"
+            "Foreground: {foreground}\n"
+            "Alpha: {alpha}\n"
+            "Tile layout: {layout}\n"
+            "Tiles: {tile_count}\n"
+            "Tile outputs: {tile_dir}\n"
             "Debug artifacts: {debug_dir}"
         ),
         "progress_running_image_matting": "MatAnyone の画像マッティングを実行しています...",
@@ -968,6 +1052,93 @@ def _build_preview_download_html(title: str, file_path: str | None) -> str:
     )
 
 
+def _build_preview_gallery_html(previews: list[tuple[str, str | None]]) -> str:
+    cards = [
+        _build_preview_download_html(title, file_path)
+        for title, file_path in previews
+        if file_path
+    ]
+    cards = [card for card in cards if card]
+    if not cards:
+        return ""
+    return f'<div class="ma2-preview-grid">{"".join(cards)}</div>'
+
+
+def _resolve_tile_layout(tile_layout: str) -> tuple[int, int]:
+    layouts = {
+        "2x2": (2, 2),
+        "3x3": (3, 3),
+    }
+    normalized = (tile_layout or "2x2").strip().lower()
+    layout = layouts.get(normalized)
+    if layout is None:
+        raise ValueError(f"Unsupported tile layout: {tile_layout}")
+    return layout
+
+
+def _build_tile_bounds(length: int, segments: int) -> list[tuple[int, int]]:
+    if length <= 0:
+        raise ValueError("Tile length must be positive.")
+    if segments <= 0:
+        raise ValueError("Tile segment count must be positive.")
+    if length < segments:
+        raise ValueError("Tile layout is larger than the frame size.")
+
+    bounds: list[tuple[int, int]] = []
+    for index in range(segments):
+        start = (length * index) // segments
+        end = (length * (index + 1)) // segments
+        if end <= start:
+            raise ValueError("Computed an empty tile region.")
+        bounds.append((start, end))
+    return bounds
+
+
+def _split_size_into_tiles(
+    size: tuple[int, int] | None,
+    tile_layout: str,
+) -> list[tuple[int, int]] | None:
+    if size is None:
+        return None
+
+    width, height = size
+    rows, cols = _resolve_tile_layout(tile_layout)
+    x_bounds = _build_tile_bounds(width, cols)
+    y_bounds = _build_tile_bounds(height, rows)
+    return [
+        (x_end - x_start, y_end - y_start)
+        for y_start, y_end in y_bounds
+        for x_start, x_end in x_bounds
+    ]
+
+
+def _split_frame_into_tiles(frame: Any, tile_layout: str) -> list[Any]:
+    rows, cols = _resolve_tile_layout(tile_layout)
+    height, width = frame.shape[:2]
+    x_bounds = _build_tile_bounds(width, cols)
+    y_bounds = _build_tile_bounds(height, rows)
+    return [
+        frame[y_start:y_end, x_start:x_end].copy()
+        for y_start, y_end in y_bounds
+        for x_start, x_end in x_bounds
+    ]
+
+
+def _split_frame_sequence_into_tiles(
+    frames: list[Any],
+    tile_layout: str,
+) -> list[list[Any]]:
+    if not frames:
+        return []
+
+    tile_count = len(_split_frame_into_tiles(frames[0], tile_layout))
+    tile_sequences = [[] for _ in range(tile_count)]
+    for frame in frames:
+        for tile_index, tile_frame in enumerate(_split_frame_into_tiles(frame, tile_layout)):
+            tile_sequences[tile_index].append(tile_frame)
+    return tile_sequences
+
+
 def _build_cli_output_target(
     base_dir: Path,
     input_path: str,
@@ -1167,6 +1338,7 @@ def _launch_in_process(args: argparse.Namespace) -> int:
     ]
     matanyone_video_examples = [str(path) for path in matanyone_video_examples if path.exists()]
     matanyone_image_examples = [str(path) for path in matanyone_image_examples if path.exists()]
+    matanyone_tile_examples = list(matanyone_video_examples)
     advanced_rembg_examples = _build_advanced_rembg_examples(Path.cwd())
     cli_examples_by_mode = build_cli_examples_by_mode(Path.cwd())
     default_language = DEFAULT_UI_LANGUAGE
@@ -1228,6 +1400,25 @@ def _launch_in_process(args: argparse.Namespace) -> int:
                 value=_ui_text(language, "matanyone_video_loaded_status")
             ),
         )
+
+    def get_frames_from_tile_video_v2(
+        video_input: str,
+        video_state: dict,
+        performance_profile: str,
+        language: str,
+        progress=gr.Progress(track_tqdm=True),
+    ):
+        outputs = list(
+            get_frames_from_video_v2(
+                video_input,
+                video_state,
+                performance_profile,
+                language,
+                progress=progress,
+            )
+        )
+        outputs[-1] = gr.update(value=_ui_text(language, "matanyone_tile_loaded_status"))
+        return tuple(outputs)
 
     def get_frames_from_image_v2(
         image_input: np.ndarray,
@@ -1502,6 +1693,249 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             ),
         )
 
+    def _render_tile_animation_outputs(
+        foreground: list[Any],
+        alpha: list[Any],
+        tile_layout: str,
+        source_fps: float,
+        export_fps: int,
+        export_max_frames: int,
+        export_bounce: bool,
+        output_dir: str | Path,
+        output_stem: str,
+        target_size: tuple[int, int] | None,
+    ) -> tuple[str, list[str], list[str]]:
+        tile_foreground_sequences = _split_frame_sequence_into_tiles(foreground, tile_layout)
+        tile_alpha_sequences = _split_frame_sequence_into_tiles(alpha, tile_layout)
+        if len(tile_foreground_sequences) != len(tile_alpha_sequences):
+            raise ValueError("Foreground and alpha tiles do not match.")
+
+        tile_sizes = _split_size_into_tiles(target_size, tile_layout)
+        if tile_sizes is None:
+            tile_sizes = [
+                (int(tile_frames[0].shape[1]), int(tile_frames[0].shape[0]))
+                for tile_frames in tile_foreground_sequences
+            ]
+
+        safe_export_fps = max(1, int(export_fps))
+        frame_skip = 1
+        output_fps = float(safe_export_fps)
+        if source_fps and source_fps > 0:
+            frame_skip = max(1, int(round(float(source_fps) / safe_export_fps)))
+            output_fps = float(source_fps) / frame_skip
+
+        max_frames = _safe_max_frames(export_max_frames)
+        tile_output_dir = Path(output_dir) / f"{output_stem}_{tile_layout}_tiles"
+        tile_output_dir.mkdir(parents=True, exist_ok=True)
+
+        tile_webp_outputs: list[str] = []
+        tile_gif_outputs: list[str] = []
+        for tile_index, (tile_foreground_frames, tile_alpha_frames) in enumerate(
+            zip(tile_foreground_sequences, tile_alpha_sequences),
+            start=1,
+        ):
+            rgba_frames: list[Image.Image] = []
+            sampled_count = 0
+            output_size = tile_sizes[tile_index - 1] if tile_index - 1 < len(tile_sizes) else None
+            for frame_index, (fg_frame, alpha_frame) in enumerate(zip(tile_foreground_frames, tile_alpha_frames)):
+                if frame_index % frame_skip != 0:
+                    continue
+                rgba_frame = remover._combine_matanyone_frames(
+                    fg_frame,
+                    alpha_frame,
+                    output_size=output_size,
+                )
+                rgba_frames.append(Image.fromarray(rgba_frame))
+                sampled_count += 1
+                if max_frames and sampled_count >= max_frames:
+                    break
+
+            if not rgba_frames:
+                continue
+
+            if export_bounce and len(rgba_frames) > 1:
+                rgba_frames = rgba_frames + rgba_frames[-2:0:-1]
+
+            duration_ms = max(1, int(round(1000 / max(output_fps, 0.01))))
+            tile_prefix = tile_output_dir / f"{output_stem}_tile_{tile_index:02d}"
+            webp_output = str(tile_prefix.with_name(f"{tile_prefix.name}_animated.webp"))
+            gif_output = str(tile_prefix.with_name(f"{tile_prefix.name}_animated.gif"))
+
+            rgba_frames[0].save(
+                webp_output,
+                format="WEBP",
+                save_all=True,
+                append_images=rgba_frames[1:],
+                duration=duration_ms,
+                loop=0,
+                lossless=False,
+                quality=85,
+            )
+            remover._save_animated_gif(
+                rgba_frames,
+                gif_output,
+                duration_ms=duration_ms,
+            )
+            tile_webp_outputs.append(webp_output)
+            tile_gif_outputs.append(gif_output)
+
+        return str(tile_output_dir), tile_webp_outputs, tile_gif_outputs
+
+    def video_matting_tile_v2(
+        video_state: dict,
+        interactive_state: dict,
+        mask_dropdown: list,
+        erode_kernel_size: int,
+        dilate_kernel_size: int,
+        model_selection: str,
+        performance_profile: str,
+        tile_layout: str,
+        export_fps: int,
+        export_max_frames: int,
+        export_bounce: bool,
+        language: str,
+        progress=gr.Progress(track_tqdm=True),
+    ):
+        """Video matting for tiled inputs that split into 2x2 or 3x3 animated exports."""
+        if not video_state.get("origin_images"):
+            raise gr.Error(_ui_text(language, "error_load_video_first"))
+
+        yield (
+            gr.update(),
+            gr.update(),
+            gr.update(value="", visible=False),
+            gr.update(value="", visible=False),
+            gr.update(value=_ui_text(language, "status_preparing_tile_matting_exports")),
+        )
+        _push_progress(progress, 0.05, _ui_text(language, "progress_loading_selected_model"))
+        sam_generator.release()
+        try:
+            selected_model = load_runtime_model(model_selection)
+        except (FileNotFoundError, ValueError) as e:
+            if available_models:
+                print(f"Warning: {str(e)}. Using {available_models[0]} instead.")
+                selected_model = load_runtime_model(available_models[0])
+            else:
+                raise ValueError("No models are available! Please check if the model files exist.")
+
+        _push_progress(progress, 0.2, _ui_text(language, "progress_building_selected_mask"))
+        template_mask = compose_selected_mask(
+            video_state["masks"][video_state["select_frame_number"]],
+            interactive_state["multi_mask"]["masks"],
+            mask_dropdown,
+        )
+        if interactive_state["multi_mask"]["masks"]:
+            video_state["masks"][video_state["select_frame_number"]] = template_mask
+
+        fps = video_state["fps"]
+        audio_path = video_state.get("audio", "")
+
+        _push_progress(progress, 0.35, _ui_text(language, "progress_running_video_matting"))
+        foreground, alpha, _runtime_profile = run_matting(
+            selected_model,
+            video_state,
+            template_mask,
+            performance_profile,
+            device_name,
+            erode_kernel_size=erode_kernel_size,
+            dilate_kernel_size=dilate_kernel_size,
+        )
+
+        target_size = video_state.get("source_size")
+        run_output_dir = create_run_output_dir(str(results_root / "matanyone2_tile"), video_state)
+        video_name = video_state.get("video_name") or "output"
+
+        _push_progress(progress, 0.8, _ui_text(language, "progress_encoding_foreground_alpha"))
+        foreground_output = generate_video_from_frames(
+            foreground,
+            output_path=str(Path(run_output_dir) / f"{video_name}_fg.mp4"),
+            fps=fps,
+            audio_path=audio_path,
+            target_size=target_size,
+        )
+        alpha_output = generate_video_from_frames(
+            alpha,
+            output_path=str(Path(run_output_dir) / f"{video_name}_alpha.mp4"),
+            fps=fps,
+            gray2rgb=True,
+            audio_path=audio_path,
+            target_size=target_size,
+        )
+        _push_progress(progress, 0.92, _ui_text(language, "progress_saving_debug_artifacts"))
+        debug_dir = export_debug_artifacts(
+            run_output_dir,
+            video_state,
+            template_mask,
+            foreground,
+            alpha,
+            device_name=device_name,
+            performance_profile=performance_profile,
+            model_name=model_selection,
+        )
+        print(f"Saved debug artifacts to {debug_dir}")
+        print(f"[Tile Video Matting] Foreground: {foreground_output}")
+        print(f"[Tile Video Matting] Alpha: {alpha_output}")
+
+        _push_progress(
+            progress,
+            0.96,
+            _ui_text(language, "progress_splitting_tiled_outputs", layout=tile_layout),
+        )
+        stem = Path(video_name).stem
+        tile_output_dir, tile_webp_outputs, tile_gif_outputs = _render_tile_animation_outputs(
+            foreground=foreground,
+            alpha=alpha,
+            tile_layout=tile_layout,
+            source_fps=fps,
+            export_fps=export_fps,
+            export_max_frames=export_max_frames,
+            export_bounce=export_bounce,
+            output_dir=run_output_dir,
+            output_stem=stem,
+            target_size=target_size,
+        )
+        _push_progress(progress, 0.99, _ui_text(language, "progress_rendering_tiled_webp_gif"))
+
+        webp_preview_items = [
+            (
+                f"{_ui_text(language, 'preview_title_webp')} · {_ui_text(language, 'tile_label', index=index)}",
+                output_path,
+            )
+            for index, output_path in enumerate(tile_webp_outputs, start=1)
+        ]
+        gif_preview_items = [
+            (
+                f"{_ui_text(language, 'preview_title_gif')} · {_ui_text(language, 'tile_label', index=index)}",
+                output_path,
+            )
+            for index, output_path in enumerate(tile_gif_outputs, start=1)
+        ]
+        _push_progress(progress, 1.0, _ui_text(language, "progress_video_matting_complete"))
+        yield (
+            gr.update(value=foreground_output, visible=True),
+            gr.update(value=alpha_output, visible=True),
+            gr.update(
+                value=_build_preview_gallery_html(webp_preview_items),
+                visible=bool(webp_preview_items),
+            ),
+            gr.update(
+                value=_build_preview_gallery_html(gif_preview_items),
+                visible=bool(gif_preview_items),
+            ),
+            gr.update(
+                value=_ui_text(
+                    language,
+                    "status_matanyone_tile_done",
+                    foreground=foreground_output,
+                    alpha=alpha_output,
+                    layout=tile_layout,
+                    tile_count=len(tile_webp_outputs),
+                    tile_dir=tile_output_dir,
+                    debug_dir=debug_dir,
+                )
+            ),
+        )
+
     def image_matting_v2(
         image_state: dict,
         interactive_state: dict,
@@ -1609,6 +2043,12 @@ def _launch_in_process(args: argparse.Namespace) -> int:
             gr.update(value="", visible=False),
             gr.update(value=_ui_text(language, "matanyone_video_idle_status")),
         )
+
+    def restart_tile_video_v2(language: str):
+        """Reset the tiled MatAnyone2 video tab for a new input."""
+        outputs = list(restart_video_v2(language))
+        outputs[-1] = gr.update(value=_ui_text(language, "matanyone_tile_idle_status"))
+        return tuple(outputs)
 
     def restart_v2():
         """Reset all states for new input - MatAnyone2 version."""
@@ -2439,6 +2879,11 @@ def _launch_in_process(args: argparse.Namespace) -> int:
     }
     .vbr-status-box textarea {
       border-color: rgba(217, 119, 6, 0.22) !important;
+    }
+    .ma2-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
     }
     .ma2-preview-card {
       border: 1px solid rgba(217, 119, 6, 0.14);
@@ -3689,14 +4134,527 @@ def _launch_in_process(args: argparse.Namespace) -> int:
 
             # ========== End MatAnyone2 Tab ==========
 
-                    build_cli_export_tab(
-                        tab_label_key="tab_advanced_pair",
-                        source_mode_value="matanyone_pair",
-                        description_key="advanced_pair_desc",
-                        manual_input_placeholder=r"D:\path\to\clip_fg.mp4 or D:\path\to\MatAnyone_dir",
-                        examples=cli_examples_by_mode["matanyone_pair"],
-                        show_alpha_inputs=True,
+            with gr.TabItem(_ui_text(default_language, "tab_matanyone2_tile"), id="matanyone2_tile") as matanyone_tile_tab:
+                matanyone_tile_header_markdown = gr.Markdown(_ui_text(default_language, "matanyone_tile_header"))
+                matanyone_tile_description_markdown = gr.Markdown(_ui_text(default_language, "matanyone_tile_description"))
+                matanyone_tile_description2_markdown = gr.Markdown(_ui_text(default_language, "matanyone_tile_description_2"))
+                register_language_target(
+                    matanyone_tile_tab,
+                    lambda lang, _meta, _ratio: gr.update(label=_ui_text(lang, "tab_matanyone2_tile")),
+                )
+                register_language_target(
+                    matanyone_tile_header_markdown,
+                    lambda lang, _meta, _ratio: gr.update(value=_ui_text(lang, "matanyone_tile_header")),
+                )
+                register_language_target(
+                    matanyone_tile_description_markdown,
+                    lambda lang, _meta, _ratio: gr.update(value=_ui_text(lang, "matanyone_tile_description")),
+                )
+                register_language_target(
+                    matanyone_tile_description2_markdown,
+                    lambda lang, _meta, _ratio: gr.update(value=_ui_text(lang, "matanyone_tile_description_2")),
+                )
+
+                ma2_tile_click_state = gr.State([[], []])
+                ma2_tile_interactive_state = gr.State({
+                    "inference_times": 0,
+                    "negative_click_times": 0,
+                    "positive_click_times": 0,
+                    "mask_save": False,
+                    "multi_mask": {"mask_names": [], "masks": []},
+                    "track_end_number": None,
+                })
+                ma2_tile_state = gr.State({
+                    "user_name": "",
+                    "video_name": "",
+                    "origin_images": None,
+                    "painted_images": None,
+                    "masks": None,
+                    "inpaint_masks": None,
+                    "logits": None,
+                    "select_frame_number": 0,
+                    "fps": 30,
+                    "audio": "",
+                    "source_fps": 30,
+                    "frame_stride": 1,
+                    "source_size": None,
+                    "working_size": None,
+                    "performance_profile": args.performance_profile,
+                })
+
+                with gr.Group():
+                    with gr.Row():
+                        ma2_tile_model_selection = gr.Radio(
+                            choices=available_models,
+                            value=default_model,
+                            label=_ui_text(default_language, "label_model_selection"),
+                            info=_ui_text(default_language, "info_choose_model"),
+                            interactive=True,
+                        )
+                        ma2_tile_performance_profile = gr.Radio(
+                            choices=PROFILE_CHOICES,
+                            value=args.performance_profile,
+                            label=_ui_text(default_language, "performance_profile_label"),
+                            info=_ui_text(default_language, "info_profile_video"),
+                            interactive=True,
+                        )
+                    with gr.Accordion(_ui_text(default_language, "matting_settings_label"), open=False) as ma2_tile_matting_settings:
+                        with gr.Row():
+                            ma2_tile_erode = gr.Slider(
+                                label=_ui_text(default_language, "label_erode_kernel"),
+                                minimum=0,
+                                maximum=30,
+                                step=1,
+                                value=10,
+                                info=_ui_text(default_language, "info_erode_kernel"),
+                                interactive=True,
+                            )
+                            ma2_tile_dilate = gr.Slider(
+                                label=_ui_text(default_language, "label_dilate_kernel"),
+                                minimum=0,
+                                maximum=30,
+                                step=1,
+                                value=10,
+                                info=_ui_text(default_language, "info_dilate_kernel"),
+                                interactive=True,
+                            )
+                        with gr.Row():
+                            ma2_tile_start_frame = gr.Slider(
+                                minimum=1,
+                                maximum=100,
+                                step=1,
+                                value=1,
+                                label=_ui_text(default_language, "label_start_frame"),
+                                info=_ui_text(default_language, "info_start_frame"),
+                                visible=False,
+                            )
+                            ma2_tile_end_frame = gr.Slider(
+                                minimum=1,
+                                maximum=100,
+                                step=1,
+                                value=1,
+                                label=_ui_text(default_language, "label_track_end_frame"),
+                                visible=False,
+                            )
+                        with gr.Row():
+                            ma2_tile_point_prompt = gr.Radio(
+                                choices=_localized_point_prompt_choices(default_language),
+                                value="Positive",
+                                label=_ui_text(default_language, "label_point_prompt"),
+                                info=_ui_text(default_language, "info_point_prompt"),
+                                interactive=False,
+                            )
+                            ma2_tile_mask_dropdown = gr.Dropdown(
+                                multiselect=True,
+                                value=[],
+                                label=_ui_text(default_language, "label_mask_selection"),
+                                info=_ui_text(default_language, "info_mask_selection"),
+                                interactive=False,
+                            )
+
+                gr.Markdown("---")
+
+                with gr.Column():
+                    with gr.Row():
+                        with gr.Column(scale=2):
+                            ma2_tile_step1_markdown = gr.Markdown(_ui_text(default_language, "step1_upload_video"))
+                        with gr.Column(scale=2):
+                            ma2_tile_step2_title = gr.Markdown(
+                                _ui_text(default_language, "step2_add_masks"),
+                            )
+                    with gr.Row():
+                        with gr.Column(scale=2):
+                            ma2_tile_input = gr.Video(label=_ui_text(default_language, "input_video_label"))
+                            ma2_tile_load_video_button = gr.Button(
+                                value=_ui_text(default_language, "load_video_button"),
+                                interactive=True,
+                            )
+                        with gr.Column(scale=2):
+                            ma2_tile_info = gr.Textbox(
+                                label=_ui_text(default_language, "video_info_label"),
+                                value=_ui_text(default_language, "default_video_info"),
+                                elem_classes=["vbr-info-box"],
+                            )
+                            ma2_tile_template_frame = gr.Image(
+                                type="pil",
+                                label=_ui_text(default_language, "interactive_frame_label"),
+                                interactive=True,
+                            )
+                            with gr.Row():
+                                ma2_tile_clear_button = gr.Button(
+                                    value=_ui_text(default_language, "clear_clicks_button"),
+                                    interactive=False,
+                                )
+                                ma2_tile_add_mask_button = gr.Button(
+                                    value=_ui_text(default_language, "add_mask_button"),
+                                    interactive=False,
+                                )
+                                ma2_tile_remove_mask_button = gr.Button(
+                                    value=_ui_text(default_language, "remove_masks_button"),
+                                    interactive=False,
+                                )
+                                ma2_tile_video_matting_button = gr.Button(
+                                    value=_ui_text(default_language, "tile_video_matting_button"),
+                                    interactive=False,
+                                )
+
+                    gr.Markdown("---")
+                    with gr.Accordion(_ui_text(default_language, "animated_output_settings"), open=True) as ma2_tile_animated_output_settings:
+                        ma2_tile_settings_hint_markdown = gr.Markdown(
+                            _ui_text(default_language, "matanyone_tile_settings_hint")
+                        )
+                        with gr.Row():
+                            ma2_tile_layout = gr.Radio(
+                                choices=["2x2", "3x3"],
+                                value="2x2",
+                                label=_ui_text(default_language, "tile_layout_label"),
+                                info=_ui_text(default_language, "tile_layout_info"),
+                                interactive=True,
+                            )
+                            ma2_tile_export_fps = gr.Slider(
+                                minimum=5,
+                                maximum=30,
+                                step=1,
+                                value=10,
+                                label=_ui_text(default_language, "export_fps_label"),
+                                info=_ui_text(default_language, "lower_fps_smaller_info"),
+                                interactive=True,
+                            )
+                            ma2_tile_export_max_frames = gr.Slider(
+                                minimum=30,
+                                maximum=300,
+                                step=10,
+                                value=150,
+                                label=_ui_text(default_language, "label_max_frames_simple"),
+                                info=_ui_text(default_language, "info_limit_frames"),
+                                interactive=True,
+                            )
+                            ma2_tile_export_bounce = gr.Checkbox(
+                                value=False,
+                                label=_ui_text(default_language, "label_bounce_loop"),
+                                info=_ui_text(default_language, "info_bounce_loop"),
+                                interactive=True,
+                            )
+
+                    gr.Markdown("---")
+
+                    with gr.Row():
+                        with gr.Column(scale=2):
+                            ma2_tile_foreground_output = gr.Video(
+                                label=_ui_text(default_language, "foreground_output_label"),
+                                visible=False,
+                            )
+                        with gr.Column(scale=2):
+                            ma2_tile_alpha_output = gr.Video(
+                                label=_ui_text(default_language, "alpha_output_label"),
+                                visible=False,
+                            )
+                    ma2_tile_status = gr.Textbox(
+                        label=_ui_text(default_language, "workflow_status_label"),
+                        lines=7,
+                        value=_ui_text(default_language, "matanyone_tile_idle_status"),
+                        elem_classes=["vbr-status-box"],
                     )
+
+                    gr.Markdown("---")
+                    ma2_tile_step3_markdown = gr.Markdown(_ui_text(default_language, "step3_preview_download"))
+                    ma2_tile_preview_hint_markdown = gr.Markdown(_ui_text(default_language, "matanyone_tile_preview_hint"))
+                    with gr.Row():
+                        ma2_tile_webp_preview = gr.HTML(visible=False)
+                        ma2_tile_gif_preview = gr.HTML(visible=False)
+
+                register_language_target(
+                    ma2_tile_matting_settings,
+                    lambda lang, _meta, _ratio: gr.update(label=_ui_text(lang, "matting_settings_label")),
+                )
+                register_language_target(
+                    ma2_tile_step1_markdown,
+                    lambda lang, _meta, _ratio: gr.update(value=_ui_text(lang, "step1_upload_video")),
+                )
+                register_language_target(
+                    ma2_tile_step2_title,
+                    lambda lang, _meta, _ratio: gr.update(value=_ui_text(lang, "step2_add_masks")),
+                )
+                for component, key in [
+                    (ma2_tile_model_selection, "label_model_selection"),
+                    (ma2_tile_performance_profile, "performance_profile_label"),
+                    (ma2_tile_erode, "label_erode_kernel"),
+                    (ma2_tile_dilate, "label_dilate_kernel"),
+                    (ma2_tile_start_frame, "label_start_frame"),
+                    (ma2_tile_end_frame, "label_track_end_frame"),
+                    (ma2_tile_mask_dropdown, "label_mask_selection"),
+                    (ma2_tile_input, "input_video_label"),
+                    (ma2_tile_info, "video_info_label"),
+                    (ma2_tile_template_frame, "interactive_frame_label"),
+                    (ma2_tile_foreground_output, "foreground_output_label"),
+                    (ma2_tile_alpha_output, "alpha_output_label"),
+                    (ma2_tile_status, "workflow_status_label"),
+                    (ma2_tile_export_fps, "export_fps_label"),
+                    (ma2_tile_export_max_frames, "label_max_frames_simple"),
+                    (ma2_tile_layout, "tile_layout_label"),
+                ]:
+                    register_language_target(
+                        component,
+                        lambda lang, _meta, _ratio, text_key=key: gr.update(label=_ui_text(lang, text_key)),
+                    )
+                register_language_target(
+                    ma2_tile_model_selection,
+                    lambda lang, _meta, _ratio: gr.update(
+                        label=_ui_text(lang, "label_model_selection"),
+                        info=_ui_text(lang, "info_choose_model"),
+                    ),
+                )
+                register_language_target(
+                    ma2_tile_performance_profile,
+                    lambda lang, _meta, _ratio: gr.update(
+                        label=_ui_text(lang, "performance_profile_label"),
+                        info=_ui_text(lang, "info_profile_video"),
+                    ),
+                )
+                register_language_target(
+                    ma2_tile_erode,
+                    lambda lang, _meta, _ratio: gr.update(
+                        label=_ui_text(lang, "label_erode_kernel"),
+                        info=_ui_text(lang, "info_erode_kernel"),
+                    ),
+                )
+                register_language_target(
+                    ma2_tile_dilate,
+                    lambda lang, _meta, _ratio: gr.update(
+                        label=_ui_text(lang, "label_dilate_kernel"),
+                        info=_ui_text(lang, "info_dilate_kernel"),
+                    ),
+                )
+                register_language_target(
+                    ma2_tile_start_frame,
+                    lambda lang, _meta, _ratio: gr.update(
+                        label=_ui_text(lang, "label_start_frame"),
+                        info=_ui_text(lang, "info_start_frame"),
+                    ),
+                )
+                register_language_target(
+                    ma2_tile_point_prompt,
+                    lambda lang, _meta, _ratio: gr.update(
+                        choices=_localized_point_prompt_choices(lang),
+                        label=_ui_text(lang, "label_point_prompt"),
+                        info=_ui_text(lang, "info_point_prompt"),
+                    ),
+                )
+                register_language_target(
+                    ma2_tile_mask_dropdown,
+                    lambda lang, _meta, _ratio: gr.update(
+                        label=_ui_text(lang, "label_mask_selection"),
+                        info=_ui_text(lang, "info_mask_selection"),
+                    ),
+                )
+                for component, key in [
+                    (ma2_tile_load_video_button, "load_video_button"),
+                    (ma2_tile_clear_button, "clear_clicks_button"),
+                    (ma2_tile_add_mask_button, "add_mask_button"),
+                    (ma2_tile_remove_mask_button, "remove_masks_button"),
+                    (ma2_tile_video_matting_button, "tile_video_matting_button"),
+                ]:
+                    register_language_target(
+                        component,
+                        lambda lang, _meta, _ratio, text_key=key: gr.update(value=_ui_text(lang, text_key)),
+                    )
+                register_language_target(
+                    ma2_tile_animated_output_settings,
+                    lambda lang, _meta, _ratio: gr.update(label=_ui_text(lang, "animated_output_settings")),
+                )
+                register_language_target(
+                    ma2_tile_settings_hint_markdown,
+                    lambda lang, _meta, _ratio: gr.update(value=_ui_text(lang, "matanyone_tile_settings_hint")),
+                )
+                register_language_target(
+                    ma2_tile_layout,
+                    lambda lang, _meta, _ratio: gr.update(
+                        label=_ui_text(lang, "tile_layout_label"),
+                        info=_ui_text(lang, "tile_layout_info"),
+                    ),
+                )
+                register_language_target(
+                    ma2_tile_export_fps,
+                    lambda lang, _meta, _ratio: gr.update(
+                        label=_ui_text(lang, "export_fps_label"),
+                        info=_ui_text(lang, "lower_fps_smaller_info"),
+                    ),
+                )
+                register_language_target(
+                    ma2_tile_export_max_frames,
+                    lambda lang, _meta, _ratio: gr.update(
+                        label=_ui_text(lang, "label_max_frames_simple"),
+                        info=_ui_text(lang, "info_limit_frames"),
+                    ),
+                )
+                register_language_target(
+                    ma2_tile_export_bounce,
+                    lambda lang, _meta, _ratio: gr.update(
+                        label=_ui_text(lang, "label_bounce_loop"),
+                        info=_ui_text(lang, "info_bounce_loop"),
+                    ),
+                )
+                register_language_target(
+                    ma2_tile_step3_markdown,
+                    lambda lang, _meta, _ratio: gr.update(value=_ui_text(lang, "step3_preview_download")),
+                )
+                register_language_target(
+                    ma2_tile_preview_hint_markdown,
+                    lambda lang, _meta, _ratio: gr.update(value=_ui_text(lang, "matanyone_tile_preview_hint")),
+                )
+
+                ma2_tile_reset_outputs = [
+                    ma2_tile_state,
+                    ma2_tile_interactive_state,
+                    ma2_tile_click_state,
+                    ma2_tile_foreground_output,
+                    ma2_tile_alpha_output,
+                    ma2_tile_template_frame,
+                    ma2_tile_start_frame,
+                    ma2_tile_end_frame,
+                    ma2_tile_point_prompt,
+                    ma2_tile_clear_button,
+                    ma2_tile_add_mask_button,
+                    ma2_tile_video_matting_button,
+                    ma2_tile_remove_mask_button,
+                    ma2_tile_mask_dropdown,
+                    ma2_tile_info,
+                    ma2_tile_step2_title,
+                    ma2_tile_webp_preview,
+                    ma2_tile_gif_preview,
+                    ma2_tile_status,
+                ]
+
+                ma2_tile_load_video_button.click(
+                    fn=get_frames_from_tile_video_v2,
+                    inputs=[ma2_tile_input, ma2_tile_state, ma2_tile_performance_profile, ui_language],
+                    outputs=[
+                        ma2_tile_state,
+                        ma2_tile_info,
+                        ma2_tile_template_frame,
+                        ma2_tile_start_frame,
+                        ma2_tile_end_frame,
+                        ma2_tile_point_prompt,
+                        ma2_tile_clear_button,
+                        ma2_tile_add_mask_button,
+                        ma2_tile_remove_mask_button,
+                        ma2_tile_video_matting_button,
+                        ma2_tile_foreground_output,
+                        ma2_tile_alpha_output,
+                        ma2_tile_mask_dropdown,
+                        ma2_tile_step2_title,
+                        ma2_tile_webp_preview,
+                        ma2_tile_gif_preview,
+                        ma2_tile_status,
+                    ],
+                    show_progress="full",
+                )
+
+                ma2_tile_start_frame.release(
+                    fn=select_video_template_v2,
+                    inputs=[ma2_tile_start_frame, ma2_tile_state, ma2_tile_interactive_state],
+                    outputs=[ma2_tile_template_frame, ma2_tile_state, ma2_tile_interactive_state],
+                )
+
+                ma2_tile_end_frame.release(
+                    fn=get_end_number_v2,
+                    inputs=[ma2_tile_end_frame, ma2_tile_state, ma2_tile_interactive_state],
+                    outputs=[ma2_tile_template_frame, ma2_tile_interactive_state],
+                )
+
+                ma2_tile_template_frame.select(
+                    fn=sam_refine_v2,
+                    inputs=[
+                        ma2_tile_state,
+                        ma2_tile_point_prompt,
+                        ma2_tile_click_state,
+                        ma2_tile_interactive_state,
+                    ],
+                    outputs=[ma2_tile_template_frame, ma2_tile_state, ma2_tile_interactive_state],
+                )
+
+                ma2_tile_add_mask_button.click(
+                    fn=add_multi_mask_v2,
+                    inputs=[ma2_tile_state, ma2_tile_interactive_state, ma2_tile_mask_dropdown],
+                    outputs=[
+                        ma2_tile_interactive_state,
+                        ma2_tile_mask_dropdown,
+                        ma2_tile_template_frame,
+                        ma2_tile_click_state,
+                    ],
+                )
+
+                ma2_tile_remove_mask_button.click(
+                    fn=remove_multi_mask_v2,
+                    inputs=[ma2_tile_interactive_state, ma2_tile_mask_dropdown],
+                    outputs=[ma2_tile_interactive_state, ma2_tile_mask_dropdown],
+                )
+
+                ma2_tile_video_matting_button.click(
+                    fn=video_matting_tile_v2,
+                    inputs=[
+                        ma2_tile_state,
+                        ma2_tile_interactive_state,
+                        ma2_tile_mask_dropdown,
+                        ma2_tile_erode,
+                        ma2_tile_dilate,
+                        ma2_tile_model_selection,
+                        ma2_tile_performance_profile,
+                        ma2_tile_layout,
+                        ma2_tile_export_fps,
+                        ma2_tile_export_max_frames,
+                        ma2_tile_export_bounce,
+                        ui_language,
+                    ],
+                    outputs=[
+                        ma2_tile_foreground_output,
+                        ma2_tile_alpha_output,
+                        ma2_tile_webp_preview,
+                        ma2_tile_gif_preview,
+                        ma2_tile_status,
+                    ],
+                    show_progress="full",
+                )
+
+                ma2_tile_mask_dropdown.change(
+                    fn=show_mask_v2,
+                    inputs=[ma2_tile_state, ma2_tile_interactive_state, ma2_tile_mask_dropdown],
+                    outputs=[ma2_tile_template_frame],
+                )
+
+                ma2_tile_input.change(
+                    fn=restart_tile_video_v2,
+                    inputs=[ui_language],
+                    outputs=ma2_tile_reset_outputs,
+                    queue=False,
+                    show_progress=False,
+                )
+
+                ma2_tile_input.clear(
+                    fn=restart_tile_video_v2,
+                    inputs=[ui_language],
+                    outputs=ma2_tile_reset_outputs,
+                    queue=False,
+                    show_progress=False,
+                )
+
+                ma2_tile_clear_button.click(
+                    fn=clear_click_v2,
+                    inputs=[ma2_tile_state, ma2_tile_click_state],
+                    outputs=[ma2_tile_template_frame, ma2_tile_click_state],
+                )
+
+                if matanyone_tile_examples:
+                    gr.Examples(examples=matanyone_tile_examples, inputs=[ma2_tile_input])
+
+            build_cli_export_tab(
+                tab_label_key="tab_advanced_pair",
+                source_mode_value="matanyone_pair",
+                description_key="advanced_pair_desc",
+                manual_input_placeholder=r"D:\path\to\clip_fg.mp4 or D:\path\to\MatAnyone_dir",
+                examples=cli_examples_by_mode["matanyone_pair"],
+                show_alpha_inputs=True,
+            )
 
         ui_language.change(
             fn=apply_ui_language,
